@@ -6,6 +6,7 @@ model Attendance {
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   clockIn     DateTime         @default(now())
   clockOut    DateTime?
+  hoursWorked Float?
   method      AttendanceMethod @default(MANUAL)
   gpsLocation String?
   createdAt   DateTime         @default(now())
