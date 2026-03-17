@@ -6,7 +6,9 @@ model DailySiteReport {
   submitter        User             @relation(fields: [submittedBy], references: [id])
   reportDate       DateTime         @db.Date
   summary          String           @db.Text
-  workerCount      Int              @default(0)
+  totalWorkers     Int              @default(0)
+  workersPresent   Int              @default(0)
+  workersAbsent    Int              @default(0)
   weatherCondition WeatherCondition
   photoUrls        String[]
   pdfUrl           String?
