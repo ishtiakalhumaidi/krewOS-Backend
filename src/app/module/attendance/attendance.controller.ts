@@ -44,8 +44,31 @@ const getProjectAttendanceToday = catchAsync(
   },
 );
 
+const getWorkerMonthlyStats = catchAsync(
+  async (req: Request, res: Response) => {
+    const { userId } = req.params;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const month =
+      parseInt(req.query.month as string) || new Date().getMonth() + 1;
+
+    const result = await AttendanceService.getWorkerMonthlyStats(
+      userId as string,
+      year,
+      month,
+    );
+
+    sendResponse(res, {
+      statusCode: status.OK,
+      success: true,
+      message: "Worker monthly statistics retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const AttendanceController = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
+  getWorkerMonthlyStats,
 };

@@ -99,8 +99,43 @@ const getProjectAttendanceToday = async (projectId: string) => {
   return result;
 };
 
+const getWorkerMonthlyStats = async (userId: string, year: number, month: number) => {
+  
+  const startDate = new Date(year, month - 1, 1); 
+  const endDate = new Date(year, month, 1);
+
+  
+  const stats = await prisma.attendance.aggregate({
+    where: {
+      userId: userId,
+      clockIn: {
+        gte: startDate,
+        lt: endDate, 
+      },
+      hoursWorked: {
+        not: null 
+      }
+    },
+    _sum: {
+      hoursWorked: true 
+    },
+    _count: {
+      id: true 
+    }
+  });
+
+  return {
+    year,
+    month,
+    totalHoursWorked: stats._sum.hoursWorked || 0,
+    totalShiftsCompleted: stats._count.id,
+  };
+};
+
+// Don't forget to export it!
 export const AttendanceService = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
+  getWorkerMonthlyStats, 
 };
