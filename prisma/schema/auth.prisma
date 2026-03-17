@@ -1,21 +1,38 @@
 model User {
-    id            String        @id
+    id            String    @id @default(uuid())
     name          String
     email         String
-    emailVerified Boolean       @default(false)
+    emailVerified Boolean   @default(false)
     image         String?
-    createdAt     DateTime      @default(now())
-    updatedAt     DateTime      @updatedAt
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
     sessions      Session[]
     accounts      Account[]
-    platformRole  PlatformRole?
 
+    // Platform Level
+    platformRole PlatformRole?
+
+    // Company Level
     companyId String?
+    company   Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
     role      CompanyRole @default(MEMBER)
+
     phone     String?
-    isActive  Boolean     @default(true)
-    isDeleted Boolean     @default(false)
+    isActive  Boolean   @default(true)
+    isDeleted Boolean   @default(false)
     deletedAt DateTime?
+
+    // ─── APP RELATIONS (Required for the rest of the app to work) ───
+    projectMemberships ProjectMember[]
+    projectsOwned      Project[]         @relation("ProjectOwner")
+    attendances        Attendance[]
+    tasksAssigned      Task[]            @relation("TaskAssignee")
+    tasksCreated       Task[]            @relation("TaskCreator")
+    siteReports        DailySiteReport[]
+    materialsRequested MaterialRequest[] @relation("MaterialRequester")
+    materialsApproved  MaterialRequest[] @relation("MaterialApprover")
+    safetyChecklists   SafetyChecklist[]
+    incidentsReported  Incident[]
 
     @@unique([email])
     @@map("user")

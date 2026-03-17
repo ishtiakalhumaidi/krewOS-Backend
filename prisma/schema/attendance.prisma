@@ -1,0 +1,18 @@
+model Attendance {
+  id          String           @id @default(uuid())
+  projectId   String
+  project     Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clockIn     DateTime         @default(now())
+  clockOut    DateTime?
+  method      AttendanceMethod @default(MANUAL)
+  gpsLocation String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([clockIn])
+  @@map("attendance")
+}

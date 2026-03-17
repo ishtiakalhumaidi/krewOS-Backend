@@ -1,0 +1,18 @@
+model Company {
+  id        String           @id @default(uuid())
+  name      String
+  slug      String           @unique
+  plan      SubscriptionPlan @default(FREE)
+  logoUrl   String?
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  users        User[]
+  projects     Project[]
+  subscription Subscription?
+  payments     Payment[]
+
+  @@map("company")
+}

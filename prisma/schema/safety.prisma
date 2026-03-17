@@ -1,0 +1,36 @@
+model SafetyChecklist {
+  id            String   @id @default(uuid())
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittedBy   String
+  submitter     User     @relation(fields: [submittedBy], references: [id])
+  checkDate     DateTime @db.Date
+  checklistData Json
+  allClear      Boolean  @default(true)
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([checkDate])
+  @@map("safety_checklist")
+}
+
+model Incident {
+  id          String   @id @default(uuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reportedBy  String
+  reporter    User     @relation(fields: [reportedBy], references: [id])
+  title       String
+  description String   @db.Text
+  photoUrls   String[]
+  severity    Severity
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([severity])
+  @@map("incident")
+}

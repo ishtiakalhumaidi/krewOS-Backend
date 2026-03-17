@@ -1,0 +1,22 @@
+model MaterialRequest {
+  id               String        @id @default(uuid())
+  projectId        String
+  project          Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  requestedBy      String
+  requester        User          @relation("MaterialRequester", fields: [requestedBy], references: [id])
+  approvedBy       String?
+  approver         User?         @relation("MaterialApprover", fields: [approvedBy], references: [id])
+  itemName         String
+  quantity         Int
+  unit             String
+  status           RequestStatus @default(PENDING)
+  notes            String?       @db.Text
+  deliveryPhotoUrl String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@index([projectId])
+  @@index([requestedBy])
+  @@index([status])
+  @@map("material_request")
+}

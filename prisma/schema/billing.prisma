@@ -1,0 +1,30 @@
+model Subscription {
+  id               String             @id @default(uuid())
+  companyId        String             @unique
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripeCustomerId String?            @unique
+  stripeSubId      String?            @unique
+  plan             SubscriptionPlan   @default(FREE)
+  status           SubscriptionStatus @default(TRIALING)
+  currentPeriodEnd DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  @@map("subscription")
+}
+
+model Payment {
+  id              String        @id @default(uuid())
+  companyId       String
+  company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  stripePaymentId String        @unique
+  amountCents     Int
+  currency        String        @default("USD")
+  status          PaymentStatus @default(PENDING)
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([companyId])
+  @@map("payment")
+}

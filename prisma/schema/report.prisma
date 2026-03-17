@@ -1,0 +1,19 @@
+model DailySiteReport {
+  id               String           @id @default(uuid())
+  projectId        String
+  project          Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  submittedBy      String
+  submitter        User             @relation(fields: [submittedBy], references: [id])
+  reportDate       DateTime         @db.Date
+  summary          String           @db.Text
+  workerCount      Int              @default(0)
+  weatherCondition WeatherCondition
+  photoUrls        String[]
+  pdfUrl           String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([projectId, reportDate])
+  @@index([projectId])
+  @@map("daily_site_report")
+}
