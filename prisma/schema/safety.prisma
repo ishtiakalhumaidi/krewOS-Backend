@@ -27,8 +27,12 @@ model Incident {
   photoUrls   String[]
   severity    Severity
   occurredAt  DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  isResolved      Boolean @default(false)
+  resolutionNotes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([projectId])
   @@index([severity])

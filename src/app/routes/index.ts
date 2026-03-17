@@ -6,6 +6,7 @@ import { ProjectMemberRoutes } from "../module/project-member/project-member.rou
 import { DailyReportRoutes } from "../module/daily-report/daily-report.route";
 import { AttendanceRoutes } from "../module/attendance/attendance.route";
 import { MaterialRequestRoutes } from "../module/material-request/material-request.route";
+import { IncidentRoutes } from "../module/incident/incident.route";
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use("/project-members", ProjectMemberRoutes);
 router.use("/daily-reports", DailyReportRoutes);
 router.use("/attendance", AttendanceRoutes);
 router.use("/material-requests", MaterialRequestRoutes);
+router.use("/incidents", IncidentRoutes);
 
 export const IndexRouter = router;
