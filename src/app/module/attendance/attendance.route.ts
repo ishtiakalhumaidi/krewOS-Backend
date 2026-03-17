@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { AttendanceController } from "./attendance.controller";
+import { validateRequest } from "../../middleware/validateRequest";
+import { clockInSchema } from "./attendance.validation";
 
 const router = Router();
 
 
-router.post("/clock-in", AttendanceController.clockIn);
+router.post("/clock-in",validateRequest(clockInSchema), AttendanceController.clockIn);
 
 router.patch("/clock-out/:attendanceId", AttendanceController.clockOut);
 

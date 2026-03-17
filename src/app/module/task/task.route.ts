@@ -1,14 +1,22 @@
 import { Router } from "express";
 import { TaskController } from "./task.controller";
+import { validateRequest } from "../../middleware/validateRequest";
+import { createTaskSchema, updateTaskSchema } from "./task.validation";
 
 const router = Router();
 
-router.post("/", TaskController.createTask);
+router.post("/", validateRequest(createTaskSchema), TaskController.createTask);
 
+router.get(
+  "/project/:projectId",
 
-router.get("/project/:projectId", TaskController.getProjectTasks);
+  TaskController.getProjectTasks,
+);
 
-
-router.patch("/:taskId", TaskController.updateTask);
+router.patch(
+  "/:taskId",
+  validateRequest(updateTaskSchema),
+  TaskController.updateTask,
+);
 
 export const TaskRoutes = router;

@@ -2,12 +2,12 @@ import { Severity } from "../../../generated/prisma/enums";
 
 export interface ICreateIncident {
   projectId: string;
-  reportedBy: string; 
-  title: string; 
+  reportedBy: string;
+  title: string;
   description: string;
-  severity: Severity; 
+  severity: Severity;
   dateOccurred: string | Date;
-  photoUrls?: string[]; 
+  photoUrls?: string[];
 }
 
 export interface IUpdateIncidentStatus {

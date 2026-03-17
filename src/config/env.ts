@@ -15,6 +15,8 @@ interface EnvConfig {
   SMTP_PORT: number;
   SMTP_USER: string;
   SMTP_PASS: string;
+  STRIPE_SECRET_KEY: string;
+  STRIPE_PUBLISHABLE_KEY: string;
 }
 
 const loadEnv = (): EnvConfig => {
@@ -30,6 +32,8 @@ const loadEnv = (): EnvConfig => {
     "SMTP_PORT",
     "SMTP_USER",
     "SMTP_PASS",
+    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_SECRET_KEY",
   ];
 
   requiredVars.forEach((varName) => {
@@ -52,6 +56,8 @@ const loadEnv = (): EnvConfig => {
     SMTP_PORT: Number(process.env.SMTP_PORT),
     SMTP_USER: process.env.SMTP_USER as string,
     SMTP_PASS: process.env.SMTP_PASS as string,
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY as string,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY as string,
   };
 };
 
