@@ -6,3 +6,4 @@ dist
 !.env.example
 /src/generated
 /src/generated/prisma
+.vscode
