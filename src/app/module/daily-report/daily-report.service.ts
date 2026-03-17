@@ -1,4 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
+import status from "http-status";
+import AppError from "../../errorHelpers/AppError";
 import { ProjectRole } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import type {
@@ -7,7 +10,7 @@ import type {
 } from "./daily-report.interface";
 
 const createReport = async (payload: ICreateDailyReport) => {
-  // 1. Ensure the user is actually a member of the project
+  // 1. Ensure member
   const isMember = await prisma.projectMember.findUnique({
     where: {
       projectId_userId: {
@@ -18,32 +21,35 @@ const createReport = async (payload: ICreateDailyReport) => {
   });
 
   if (!isMember) {
-    throw new Error(
+    throw new AppError(
+      status.FORBIDDEN,
       "You must be a member of this project to submit a daily report",
     );
   }
 
-  // 2.THE CALCULATION LOGIC
-
+  // 2. Calculation
   const totalWorkers = await prisma.projectMember.count({
     where: {
       projectId: payload.projectId,
       role: ProjectRole.WORKER,
     },
   });
+
   if (payload.workersPresent > totalWorkers) {
-    throw new Error("Present workers cannot be greater than total workers");
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Present workers cannot be greater than total workers",
+    );
   }
-  
+
   const workersAbsent = Math.max(0, totalWorkers - payload.workersPresent);
 
   try {
-    // 3. Create the report
     const result = await prisma.dailySiteReport.create({
       data: {
         ...payload,
-        totalWorkers: totalWorkers, // Calculated by Prisma
-        workersAbsent: workersAbsent, // Calculated by our math
+        totalWorkers,
+        workersAbsent,
         reportDate: new Date(payload.reportDate),
       },
       include: {
@@ -56,12 +62,16 @@ const createReport = async (payload: ICreateDailyReport) => {
     return result;
   } catch (error: any) {
     if (error.code === "P2002") {
-      throw new Error(
-        "A daily report has already been submitted for this project on this date. Please update the existing report instead.",
-        { cause: error },
+      throw new AppError(
+        status.CONFLICT,
+        "A daily report already exists for this project on this date",
       );
     }
-    throw new Error("Failed to submit daily report", { cause: error });
+
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      "Failed to submit daily report",
+    );
   }
 };
 
@@ -75,21 +85,49 @@ const getProjectReports = async (projectId: string) => {
       },
     },
   });
+
   return result;
 };
 
 const updateReport = async (reportId: string, payload: IUpdateDailyReport) => {
   try {
+    
+    const existingReport = await prisma.dailySiteReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!existingReport) {
+      throw new AppError(status.NOT_FOUND, "Daily report not found");
+    }
+
+    
+    const updateData: any = { ...payload };
+
+    
+    if (payload.workersPresent !== undefined) {
+     
+      updateData.workersAbsent = Math.max(
+        0, 
+        existingReport.totalWorkers - payload.workersPresent
+      );
+    }
+
+    // Save the changes to the database
     const result = await prisma.dailySiteReport.update({
       where: { id: reportId },
-      data: payload,
+      data: updateData,
     });
+
     return result;
   } catch (error: any) {
     if (error.code === "P2025") {
-      throw new Error("Daily report not found", { cause: error });
+      throw new AppError(status.NOT_FOUND, "Daily report not found");
     }
-    throw new Error("Failed to update daily report", { cause: error });
+
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      "Failed to update daily report"
+    );
   }
 };
 

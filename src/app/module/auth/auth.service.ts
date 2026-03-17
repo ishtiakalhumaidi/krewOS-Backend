@@ -1,3 +1,5 @@
+import status from "http-status";
+
 import { envVars } from "../../../config/env";
 import { CompanyRole } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
@@ -11,13 +13,16 @@ import type {
   IRegisterMember,
 } from "./auth.interface";
 import jwt from "jsonwebtoken";
+import AppError from "../../errorHelpers/AppError";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
+
   const slug =
     companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now();
+
   const newCompany = await prisma.company.create({
-    data: { name: companyName, slug: slug },
+    data: { name: companyName, slug },
   });
 
   try {
@@ -32,7 +37,10 @@ const registerPublicOwner = async (payload: IPublicRegister) => {
       },
     });
 
-    if (!data.user) throw new Error("Failed to Register User");
+    if (!data.user) {
+      throw new AppError(status.BAD_REQUEST, "Failed to register user");
+    }
+
     return data;
   } catch (error) {
     await prisma.company.delete({ where: { id: newCompany.id } });
@@ -42,13 +50,14 @@ const registerPublicOwner = async (payload: IPublicRegister) => {
 
 const sendInvite = async (payload: IInviteWorker) => {
   const { email, role, companyId } = payload;
+
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { name: true },
   });
 
   if (!company) {
-    throw new Error("Company not found");
+    throw new AppError(status.NOT_FOUND, "Company not found");
   }
 
   const token = jwt.sign({ email, companyId, role }, envVars.JWT_SECRET, {
@@ -70,11 +79,17 @@ const sendInvite = async (payload: IInviteWorker) => {
 const registerInvitedMember = async (payload: IRegisterMember) => {
   const { token, name, password } = payload;
 
-  const decoded = jwt.verify(token, envVars.JWT_SECRET) as {
-    email: string;
-    companyId: string;
-    role: string;
-  };
+  let decoded;
+
+  try {
+    decoded = jwt.verify(token, envVars.JWT_SECRET) as {
+      email: string;
+      companyId: string;
+      role: string;
+    };
+  } catch {
+    throw new AppError(status.UNAUTHORIZED, "Invalid or expired invite token");
+  }
 
   const data = await auth.api.signUpEmail({
     body: {
@@ -88,7 +103,7 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
   });
 
   if (!data.user) {
-    throw new Error("Failed to Register User");
+    throw new AppError(status.BAD_REQUEST, "Failed to register invited member");
   }
 
   return data;
@@ -105,21 +120,26 @@ const loginUser = async (payload: ILoginUser) => {
   });
 
   if (!data.user) {
-    throw new Error("Invalid email or password");
+    throw new AppError(status.UNAUTHORIZED, "Invalid email or password");
   }
 
   if (data.user.isDeleted) {
-    throw new Error("User account has been deleted. Please contact support.");
+    throw new AppError(
+      status.FORBIDDEN,
+      "User account has been deleted. Please contact support.",
+    );
   }
 
   if (!data.user.isActive) {
-    throw new Error(
+    throw new AppError(
+      status.FORBIDDEN,
       "User account is suspended. Please contact your Company Admin.",
     );
   }
 
   return data;
 };
+
 export const AuthService = {
   registerPublicOwner,
   registerInvitedMember,

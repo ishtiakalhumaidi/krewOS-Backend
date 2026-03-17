@@ -1,3 +1,5 @@
+import status from "http-status";
+import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { IClockIn } from "./attendance.interface";
 
@@ -8,12 +10,16 @@ const clockIn = async (payload: IClockIn) => {
       projectId_userId: {
         projectId: payload.projectId,
         userId: payload.userId,
-      }
-    }
+      },
+    },
   });
 
   if (!isMember) {
-    throw new Error("Worker is not assigned to this project site");
+    // throw new Error("Worker is not assigned to this project site");
+    throw new AppError(
+      status.FORBIDDEN,
+      "Worker is not assigned to this project site",
+    );
   }
 
   // 2. Prevent duplicate clock-ins for today.
@@ -25,13 +31,16 @@ const clockIn = async (payload: IClockIn) => {
       projectId: payload.projectId,
       userId: payload.userId,
       clockIn: {
-        gte: today, 
-      }
-    }
+        gte: today,
+      },
+    },
   });
 
   if (existingAttendance) {
-    throw new Error("Worker has already clocked in today");
+    throw new AppError(
+      status.CONFLICT,
+      "Worker has already clocked in today",
+    );
   }
 
   // 3. Create the clock-in record
@@ -41,11 +50,10 @@ const clockIn = async (payload: IClockIn) => {
       userId: payload.userId,
       method: payload.method,
       gpsLocation: payload.gpsLocation,
-      
     },
     include: {
-      user: { select: { name: true, email: true } }
-    }
+      user: { select: { name: true, email: true } },
+    },
   });
 
   return result;
@@ -53,23 +61,27 @@ const clockIn = async (payload: IClockIn) => {
 
 const clockOut = async (attendanceId: string) => {
   const existingRecord = await prisma.attendance.findUnique({
-    where: { id: attendanceId }
+    where: { id: attendanceId },
   });
 
   if (!existingRecord) {
-    throw new Error("Attendance record not found");
+    throw new AppError(status.NOT_FOUND, "Attendance record not found");
   }
   if (existingRecord.clockOut) {
-    throw new Error("Worker has already clocked out today");
+    throw new AppError(
+      status.CONFLICT,
+      "Worker has already clocked out today",
+    );
   }
 
   const clockOutTime = new Date();
-  
-  
-  const diffInMilliseconds = clockOutTime.getTime() - existingRecord.clockIn.getTime();
-  const hoursWorked = Number((diffInMilliseconds / (1000 * 60 * 60)).toFixed(2));
 
-  
+  const diffInMilliseconds =
+    clockOutTime.getTime() - existingRecord.clockIn.getTime();
+  const hoursWorked = Number(
+    (diffInMilliseconds / (1000 * 60 * 60)).toFixed(2),
+  );
+
   const result = await prisma.attendance.update({
     where: { id: attendanceId },
     data: {
@@ -86,42 +98,44 @@ const getProjectAttendanceToday = async (projectId: string) => {
   today.setHours(0, 0, 0, 0);
 
   const result = await prisma.attendance.findMany({
-    where: { 
+    where: {
       projectId: projectId,
-      clockIn: { gte: today }
+      clockIn: { gte: today },
     },
     include: {
-      user: { select: { name: true } }
+      user: { select: { name: true } },
     },
-    orderBy: { clockIn: 'desc' }
+    orderBy: { clockIn: "desc" },
   });
-  
+
   return result;
 };
 
-const getWorkerMonthlyStats = async (userId: string, year: number, month: number) => {
-  
-  const startDate = new Date(year, month - 1, 1); 
+const getWorkerMonthlyStats = async (
+  userId: string,
+  year: number,
+  month: number,
+) => {
+  const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 1);
 
-  
   const stats = await prisma.attendance.aggregate({
     where: {
       userId: userId,
       clockIn: {
         gte: startDate,
-        lt: endDate, 
+        lt: endDate,
       },
       hoursWorked: {
-        not: null 
-      }
+        not: null,
+      },
     },
     _sum: {
-      hoursWorked: true 
+      hoursWorked: true,
     },
     _count: {
-      id: true 
-    }
+      id: true,
+    },
   });
 
   return {
@@ -137,5 +151,5 @@ export const AttendanceService = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
-  getWorkerMonthlyStats, 
+  getWorkerMonthlyStats,
 };

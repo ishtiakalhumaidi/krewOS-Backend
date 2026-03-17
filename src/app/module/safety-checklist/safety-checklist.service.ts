@@ -1,3 +1,5 @@
+import status from "http-status";
+import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { ICreateSafetyChecklist } from "./safety-checklist.interface";
 
@@ -13,7 +15,8 @@ const createChecklist = async (payload: ICreateSafetyChecklist) => {
   });
 
   if (!isMember) {
-    throw new Error("You must be assigned to this project to submit a safety checklist");
+     throw new AppError(
+      status.FORBIDDEN,"You must be assigned to this project to submit a safety checklist");
   }
 
   // 2. Create the checklist

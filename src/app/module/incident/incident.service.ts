@@ -1,3 +1,5 @@
+import status from "http-status";
+import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type {
   ICreateIncident,
@@ -16,7 +18,8 @@ const createIncident = async (payload: ICreateIncident) => {
   });
 
   if (!isMember) {
-    throw new Error(
+    throw new AppError(
+      status.FORBIDDEN,
       "You must be assigned to this project to report an incident",
     );
   }

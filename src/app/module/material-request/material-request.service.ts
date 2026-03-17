@@ -1,8 +1,10 @@
+import status from "http-status";
 import { prisma } from "../../lib/prisma";
 import type {
   ICreateMaterialRequest,
   IUpdateMaterialRequestStatus,
 } from "./material-request.interface";
+import AppError from "../../errorHelpers/AppError";
 
 const createRequest = async (payload: ICreateMaterialRequest) => {
   // Ensure the worker is on the project
@@ -16,7 +18,8 @@ const createRequest = async (payload: ICreateMaterialRequest) => {
   });
 
   if (!isMember) {
-    throw new Error(
+    throw new AppError(
+      status.FORBIDDEN,
       "You must be assigned to this project to request materials",
     );
   }

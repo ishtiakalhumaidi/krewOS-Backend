@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from "express";
 import { IndexRouter } from "./app/routes";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { notFoundHandler } from "./app/middleware/notFoundHandler";
+import AppError from "./app/errorHelpers/AppError";
+import status from "http-status";
 
 const app: Application = express();
 
@@ -16,7 +18,8 @@ app.use("/api/v1", IndexRouter);
 
 // Basic route
 app.get("/", (req: Request, res: Response) => {
-  res.send("Welcome to the KrewOS Backend!");
+  throw new AppError(status.BAD_REQUEST, "testing global error handler");
+  // res.send("Welcome to the KrewOS Backend!");
 });
 
 app.use(globalErrorHandler);

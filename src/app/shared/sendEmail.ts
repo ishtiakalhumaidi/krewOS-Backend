@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 import nodemailer from "nodemailer";
+import status from "http-status";
+import AppError from "../errorHelpers/AppError";
 import { envVars } from "../../config/env";
 
 export const transporter = nodemailer.createTransport({
@@ -15,9 +18,11 @@ export const transporter = nodemailer.createTransport({
 transporter
   .verify()
   .then(() => {
-    console.log("🚀 Mail server is ready to take our messages");
+    console.log("🚀 Mail server is ready");
   })
-  .catch(console.error);
+  .catch((error) => {
+    console.error("Mail server error:", error);
+  });
 
 export const sendEmail = async (to: string, subject: string, html: string) => {
   try {
@@ -27,11 +32,13 @@ export const sendEmail = async (to: string, subject: string, html: string) => {
       subject,
       html,
     });
-    console.log("Message sent: %s", info.messageId);
+
+    console.log("Message sent:", info.messageId);
+
     return info;
   } catch (error: any) {
-    console.error("Error sending email:", error);
+    console.error("Email sending failed:", error);
 
-    throw new Error("Failed to send email", { cause: error });
+    throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to send email");
   }
 };
