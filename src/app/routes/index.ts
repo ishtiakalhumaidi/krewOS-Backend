@@ -7,6 +7,7 @@ import { DailyReportRoutes } from "../module/daily-report/daily-report.route";
 import { AttendanceRoutes } from "../module/attendance/attendance.route";
 import { MaterialRequestRoutes } from "../module/material-request/material-request.route";
 import { IncidentRoutes } from "../module/incident/incident.route";
+import { SafetyChecklistRoutes } from "../module/safety-checklist/safety-checklist.route";
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use("/daily-reports", DailyReportRoutes);
 router.use("/attendance", AttendanceRoutes);
 router.use("/material-requests", MaterialRequestRoutes);
 router.use("/incidents", IncidentRoutes);
+router.use("/safety-checklists", SafetyChecklistRoutes);
 
 export const IndexRouter = router;
