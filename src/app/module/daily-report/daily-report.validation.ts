@@ -4,8 +4,6 @@ import { WeatherCondition } from "../../../generated/prisma/enums";
 export const createDailyReportSchema = z.object({
   projectId: z.uuid("Invalid project ID format"),
 
-  submittedBy: z.string().min(1, "SubmittedBy (user ID) is required"),
-
   reportDate: z
     .string()
     .refine((date) => !isNaN(Date.parse(date)), "Invalid report date format"),

@@ -1,4 +1,4 @@
-import type { CompanyRole } from "../../../generated/prisma/enums";
+import type { UserRole } from "../../../generated/prisma/enums";
 
 export interface IPublicRegister {
   companyName: string;
@@ -15,7 +15,7 @@ export interface IRegisterMember {
 
 export interface IInviteWorker {
   email: string;
-  role: CompanyRole;
+  role: UserRole;
   companyId: string;
 }
 

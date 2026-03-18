@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma";
-import { CompanyRole } from "../../generated/prisma/enums";
+import { UserRole } from "../../generated/prisma/enums";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -12,10 +12,6 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      platformRole: {
-        type: "string",
-        required: false,
-      },
       companyId: {
         type: "string",
         required: false,
@@ -24,7 +20,7 @@ export const auth = betterAuth({
       role: {
         type: "string",
         required: true,
-        defaultValue: CompanyRole.MEMBER,
+        defaultValue: UserRole.MEMBER,
       },
       phone: {
         type: "string",
@@ -46,6 +42,14 @@ export const auth = betterAuth({
         required: false,
         defaultValue: null,
       },
+    },
+  },
+  session: {
+    expiresIn: 60 * 60 * 60 * 24,
+    updateAge: 60 * 60 * 60 * 24,
+    cookieCache: {
+      enabled: true,
+      maxAge: 60 * 60 * 60 * 24,
     },
   },
 });

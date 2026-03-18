@@ -5,7 +5,7 @@ import { z } from "zod";
 export const createSafetyChecklistSchema = z.object({
   projectId: z.uuid("Invalid project ID format"),
 
-  submittedBy: z.string().min(1, "SubmittedBy (user ID) is required"),
+
 
   checkDate: z.union([z.string(), z.date()]).refine((date) => {
     const d = typeof date === "string" ? Date.parse(date) : date.getTime();

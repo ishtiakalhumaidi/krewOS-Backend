@@ -9,13 +9,9 @@ model User {
     sessions      Session[]
     accounts      Account[]
 
-    // Platform Level
-    platformRole PlatformRole?
-
-    // Company Level
     companyId String?
-    company   Company?    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-    role      CompanyRole @default(MEMBER)
+    company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+    role      UserRole @default(MEMBER)
 
     phone     String?
     isActive  Boolean   @default(true)

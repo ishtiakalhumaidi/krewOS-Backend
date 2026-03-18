@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,8 +7,9 @@ import { SafetyChecklistService } from "./safety-checklist.service";
 
 const createChecklist = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.submittedBy = (req as any).user.userId;
   const result = await SafetyChecklistService.createChecklist(payload);
-  
+
   sendResponse(res, {
     statusCode: status.CREATED,
     success: true,
@@ -18,8 +20,10 @@ const createChecklist = catchAsync(async (req: Request, res: Response) => {
 
 const getProjectChecklists = catchAsync(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const result = await SafetyChecklistService.getProjectChecklists(projectId as string);
-  
+  const result = await SafetyChecklistService.getProjectChecklists(
+    projectId as string,
+  );
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,

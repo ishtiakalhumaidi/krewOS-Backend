@@ -2,8 +2,8 @@ import { TaskStatus, TaskPriority } from "../../../generated/prisma/enums";
 
 export interface ICreateTask {
   projectId: string;
-  createdBy: string;    
-  assignedTo?: string;   
+  createdBy: string;
+  assignedTo?: string;
   title: string;
   description?: string;
   status?: TaskStatus;
@@ -12,6 +12,7 @@ export interface ICreateTask {
 }
 
 export interface IUpdateTask {
+  projectId: string;
   title?: string;
   description?: string;
   assignedTo?: string;

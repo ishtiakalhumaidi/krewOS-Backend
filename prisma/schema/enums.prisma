@@ -1,14 +1,9 @@
-enum PlatformRole {
-  SUPER_ADMIN
-  PLATFORM_ADMIN
+enum UserRole {
+  SUPER_ADMIN   // You (Manages krewOS, billing, platform analytics)
+  OWNER         // The Boss of the Construction Company (pays the Stripe bill)
+  ADMIN         // HR/Office Manager for the Construction Company
+  MEMBER        // Standard worker (gets assigned to projects)
 }
-
-enum CompanyRole {
-  OWNER
-  ADMIN
-  MEMBER
-}
-
 enum ProjectRole {
   PROJECT_MANAGER
   SITE_MANAGER
@@ -85,4 +80,10 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+}
+
+enum CompanyStatus {
+  ACTIVE      // Paying and actively using krewOS
+  SUSPENDED   // SUPER_ADMIN hit the kill switch (e.g., TOS violation)
+  INACTIVE    // The company voluntarily canceled their account
 }

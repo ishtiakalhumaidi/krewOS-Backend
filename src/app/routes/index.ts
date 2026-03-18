@@ -8,10 +8,13 @@ import { AttendanceRoutes } from "../module/attendance/attendance.route";
 import { MaterialRequestRoutes } from "../module/material-request/material-request.route";
 import { IncidentRoutes } from "../module/incident/incident.route";
 import { SafetyChecklistRoutes } from "../module/safety-checklist/safety-checklist.route";
+import { CompanyRoutes } from "../module/company/company.route";
+import { AdminRoutes } from "../module/admin/admin.route";
 
 const router = Router();
 
 router.use("/auth", AuthRoutes);
+router.use("/companies", CompanyRoutes);
 router.use("/projects", ProjectRoutes);
 router.use("/tasks", TaskRoutes);
 router.use("/project-members", ProjectMemberRoutes);
@@ -20,5 +23,6 @@ router.use("/attendance", AttendanceRoutes);
 router.use("/material-requests", MaterialRequestRoutes);
 router.use("/incidents", IncidentRoutes);
 router.use("/safety-checklists", SafetyChecklistRoutes);
+router.use("/admin", AdminRoutes);
 
 export const IndexRouter = router;

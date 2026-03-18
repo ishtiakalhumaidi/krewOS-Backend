@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,6 +7,7 @@ import { ProjectService } from "./project.service";
 
 const createProject = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.ownerId = (req as any).user.userId;
   const result = await ProjectService.createProject(payload);
 
   sendResponse(res, {

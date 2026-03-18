@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,6 +7,7 @@ import { MaterialRequestService } from "./material-request.service";
 
 const createRequest = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.requestedBy = (req as any).user.userId;
   const result = await MaterialRequestService.createRequest(payload);
 
   sendResponse(res, {
@@ -33,6 +35,7 @@ const getProjectRequests = catchAsync(async (req: Request, res: Response) => {
 const updateStatus = catchAsync(async (req: Request, res: Response) => {
   const { requestId } = req.params;
   const payload = req.body;
+  payload.approvedBy = (req as any).user.userId;
   const result = await MaterialRequestService.updateRequestStatus(
     requestId as string,
     payload,

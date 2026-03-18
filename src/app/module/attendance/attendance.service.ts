@@ -37,10 +37,7 @@ const clockIn = async (payload: IClockIn) => {
   });
 
   if (existingAttendance) {
-    throw new AppError(
-      status.CONFLICT,
-      "Worker has already clocked in today",
-    );
+    throw new AppError(status.CONFLICT, "Worker has already clocked in today");
   }
 
   // 3. Create the clock-in record
@@ -59,7 +56,7 @@ const clockIn = async (payload: IClockIn) => {
   return result;
 };
 
-const clockOut = async (attendanceId: string) => {
+const clockOut = async (attendanceId: string, userId: string) => {
   const existingRecord = await prisma.attendance.findUnique({
     where: { id: attendanceId },
   });
@@ -67,11 +64,15 @@ const clockOut = async (attendanceId: string) => {
   if (!existingRecord) {
     throw new AppError(status.NOT_FOUND, "Attendance record not found");
   }
-  if (existingRecord.clockOut) {
+
+  if (existingRecord.userId !== userId) {
     throw new AppError(
-      status.CONFLICT,
-      "Worker has already clocked out today",
+      status.FORBIDDEN,
+      "You can only clock out your own attendance record",
     );
+  }
+  if (existingRecord.clockOut) {
+    throw new AppError(status.CONFLICT, "Worker has already clocked out today");
   }
 
   const clockOutTime = new Date();

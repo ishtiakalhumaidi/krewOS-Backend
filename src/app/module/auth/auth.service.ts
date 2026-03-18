@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 
 import { envVars } from "../../../config/env";
-import { CompanyRole } from "../../../generated/prisma/enums";
+import { UserRole } from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { inviteTemplate } from "../../shared/mailTemplates/inviteTemplate";
@@ -12,8 +14,10 @@ import type {
   IPublicRegister,
   IRegisterMember,
 } from "./auth.interface";
-import jwt from "jsonwebtoken";
 import AppError from "../../errorHelpers/AppError";
+import { tokenUtils } from "../../utils/token";
+import { jwtUtils } from "../../utils/jwt";
+import type { JwtPayload } from "jsonwebtoken";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
@@ -32,7 +36,7 @@ const registerPublicOwner = async (payload: IPublicRegister) => {
         email,
         password,
         companyId: newCompany.id,
-        role: CompanyRole.OWNER,
+        role: UserRole.OWNER,
         isActive: true,
       },
     });
@@ -41,7 +45,24 @@ const registerPublicOwner = async (payload: IPublicRegister) => {
       throw new AppError(status.BAD_REQUEST, "Failed to register user");
     }
 
-    return data;
+    const accessToken = tokenUtils.getAccessToken({
+      userId: data.user.id,
+      role: data.user.role,
+      name: data.user.name,
+      email: data.user.email,
+      isDelete: data.user.isDeleted,
+      emailVerified: data.user.emailVerified,
+    });
+    const refreshToken = tokenUtils.getRefreshToken({
+      userId: data.user.id,
+      role: data.user.role,
+      name: data.user.name,
+      email: data.user.email,
+      isDelete: data.user.isDeleted,
+      emailVerified: data.user.emailVerified,
+    });
+
+    return { ...data, accessToken, refreshToken };
   } catch (error) {
     await prisma.company.delete({ where: { id: newCompany.id } });
     throw error;
@@ -60,9 +81,7 @@ const sendInvite = async (payload: IInviteWorker) => {
     throw new AppError(status.NOT_FOUND, "Company not found");
   }
 
-  const token = jwt.sign({ email, companyId, role }, envVars.JWT_SECRET, {
-    expiresIn: "48h",
-  });
+  const token = tokenUtils.getAccessToken({ email, companyId, role });
 
   const inviteLink = `${envVars.FRONTEND_URL}/join?token=${token}`;
 
@@ -79,36 +98,113 @@ const sendInvite = async (payload: IInviteWorker) => {
 const registerInvitedMember = async (payload: IRegisterMember) => {
   const { token, name, password } = payload;
 
-  let decoded;
-
+  // 1. Verify the Token (Don't just decode, verify the signature!)
+  let decoded: any;
   try {
-    decoded = jwt.verify(token, envVars.JWT_SECRET) as {
-      email: string;
-      companyId: string;
-      role: string;
+    decoded = jwtUtils.verifyToken(token, envVars.ACCESS_TOKEN_SECRET) as {
+      success: boolean;
+      data: {
+        email: string;
+        companyId: string;
+        role: string;
+      };
     };
-  } catch {
-    throw new AppError(status.UNAUTHORIZED, "Invalid or expired invite token");
+  } catch (err) {
+    throw new AppError(
+      status.UNAUTHORIZED,
+      "Invalid, expired, or tampered invite token",
+    );
   }
 
-  const data = await auth.api.signUpEmail({
-    body: {
-      email: decoded.email,
-      name,
-      password,
-      companyId: decoded.companyId,
-      role: decoded.role,
-      isActive: true,
+  if (
+    !decoded?.data?.email ||
+    !decoded?.data?.companyId ||
+    !decoded?.data?.role
+  ) {
+    throw new AppError(status.BAD_REQUEST, "Malformed invite token payload");
+  }
+
+  // 2. Create the Auth User (BetterAuth)
+  let authUser;
+  try {
+    const data = await auth.api.signUpEmail({
+      body: {
+        email: decoded.data.email,
+        name,
+        password,
+      },
+    });
+
+    if (!data?.user)
+      throw new Error("Authentication provider did not return user data");
+    authUser = data.user;
+  } catch (err: any) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      `Failed to create account: ${err.message}`,
+    );
+  }
+  try {
+    const formattedRole = decoded.data.role.toUpperCase() as UserRole;
+
+    await prisma.user.update({
+      where: { id: authUser.id },
+      data: {
+        companyId: decoded.data.companyId,
+        role: formattedRole,
+        isActive: true,
+        emailVerified: true,
+      },
+    });
+  } catch (err: any) {
+    console.error("🔥 PRISMA UPDATE FAILED:", err);
+
+    try {
+      await prisma.user.delete({ where: { id: authUser.id } });
+    } catch (rollbackErr) {
+      console.error(
+        "🚨 CRITICAL: Failed to rollback orphaned user!",
+        rollbackErr,
+      );
+    }
+
+    if (err.code === "P2003") {
+      throw new AppError(
+        status.BAD_REQUEST,
+        "The company associated with this invite no longer exists.",
+      );
+    }
+
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      `Database assignment failed: ${err.message}`,
+    );
+  }
+
+  const formattedRole = decoded.data.role.toUpperCase();
+
+  const tokenPayload = {
+    userId: authUser.id,
+    role: formattedRole,
+    name: authUser.name,
+    email: authUser.email,
+    isDelete: false,
+    emailVerified: true,
+  };
+
+  const accessToken = tokenUtils.getAccessToken(tokenPayload);
+  const refreshToken = tokenUtils.getRefreshToken(tokenPayload);
+
+  return {
+    user: {
+      ...authUser,
+      role: formattedRole,
+      companyId: decoded.data.companyId,
     },
-  });
-
-  if (!data.user) {
-    throw new AppError(status.BAD_REQUEST, "Failed to register invited member");
-  }
-
-  return data;
+    accessToken,
+    refreshToken,
+  };
 };
-
 const loginUser = async (payload: ILoginUser) => {
   const { email, password } = payload;
 
@@ -137,7 +233,58 @@ const loginUser = async (payload: ILoginUser) => {
     );
   }
 
-  return data;
+  const accessToken = tokenUtils.getAccessToken({
+    userId: data.user.id,
+    role: data.user.role,
+    name: data.user.name,
+    email: data.user.email,
+    isDelete: data.user.isDeleted,
+    emailVerified: data.user.emailVerified,
+  });
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: data.user.id,
+    role: data.user.role,
+    name: data.user.name,
+    email: data.user.email,
+    isDelete: data.user.isDeleted,
+    emailVerified: data.user.emailVerified,
+  });
+
+  return { ...data, accessToken, refreshToken };
+};
+
+const getNewToken = async (refreshToken: string, sessionToken: string) => {
+  const verifiedRefreshToken = jwtUtils.verifyToken(
+    refreshToken,
+    envVars.REFRESH_TOKEN_SECRET,
+  );
+  if (!verifiedRefreshToken.success && verifiedRefreshToken.error) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid refresh token");
+  }
+
+  const data = verifiedRefreshToken.data as JwtPayload;
+
+  const newAccessToken = tokenUtils.getAccessToken({
+    userId: data.user.id,
+    role: data.user.role,
+    name: data.user.name,
+    email: data.user.email,
+    isDelete: data.user.isDeleted,
+    emailVerified: data.user.emailVerified,
+  });
+  const newRefreshToken = tokenUtils.getRefreshToken({
+    userId: data.user.id,
+    role: data.user.role,
+    name: data.user.name,
+    email: data.user.email,
+    isDelete: data.user.isDeleted,
+    emailVerified: data.user.emailVerified,
+  });
+
+  return {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  };
 };
 
 export const AuthService = {

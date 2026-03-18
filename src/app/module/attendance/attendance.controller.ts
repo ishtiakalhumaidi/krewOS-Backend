@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,6 +7,7 @@ import { AttendanceService } from "./attendance.service";
 
 const clockIn = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.userId = (req as any).user.userId;
   const result = await AttendanceService.clockIn(payload);
 
   sendResponse(res, {
@@ -18,7 +20,8 @@ const clockIn = catchAsync(async (req: Request, res: Response) => {
 
 const clockOut = catchAsync(async (req: Request, res: Response) => {
   const { attendanceId } = req.params;
-  const result = await AttendanceService.clockOut(attendanceId as string);
+  const userId = (req as any).user.userId;
+  const result = await AttendanceService.clockOut(attendanceId as string, userId);
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -31,6 +34,7 @@ const clockOut = catchAsync(async (req: Request, res: Response) => {
 const getProjectAttendanceToday = catchAsync(
   async (req: Request, res: Response) => {
     const { projectId } = req.params;
+
     const result = await AttendanceService.getProjectAttendanceToday(
       projectId as string,
     );

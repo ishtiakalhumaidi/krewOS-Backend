@@ -3,16 +3,28 @@ import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AuthService } from "./auth.service";
+import { tokenUtils } from "../../utils/token";
 
 const registerPublicOwner = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   const result = await AuthService.registerPublicOwner(payload);
 
+  const { accessToken, refreshToken, token, ...rest } = result;
+
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+  tokenUtils.setBetterAuthSessionCookie(res, token as string);
+
   sendResponse(res, {
     statusCode: status.CREATED,
     success: true,
     message: "Company and Owner account created successfully",
-    data: result,
+    data: {
+      token,
+      accessToken,
+      refreshToken,
+      ...rest,
+    },
   });
 });
 
@@ -35,12 +47,21 @@ const registerInvitedMember = catchAsync(
   async (req: Request, res: Response) => {
     const payload = req.body;
     const result = await AuthService.registerInvitedMember(payload);
+    const { accessToken, refreshToken, token, ...rest } = result;
 
+    tokenUtils.setAccessTokenCookie(res, accessToken);
+    tokenUtils.setRefreshTokenCookie(res, refreshToken);
+    tokenUtils.setBetterAuthSessionCookie(res, token as string);
     sendResponse(res, {
       statusCode: status.CREATED,
       success: true,
       message: "Member account created successfully",
-      data: result,
+      data: {
+        token,
+        accessToken,
+        refreshToken,
+        ...rest,
+      },
     });
   },
 );
@@ -49,11 +70,22 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   const result = await AuthService.loginUser(payload);
 
+  const { accessToken, refreshToken, token, ...rest } = result;
+
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, refreshToken);
+  tokenUtils.setBetterAuthSessionCookie(res, token);
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
     message: `${result.user.role.toUpperCase()} logged in successfully`,
-    data: result,
+    data: {
+      token,
+      accessToken,
+      refreshToken,
+      ...rest,
+    },
   });
 });
 

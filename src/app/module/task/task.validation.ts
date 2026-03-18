@@ -4,12 +4,7 @@ import { TaskPriority, TaskStatus } from "../../../generated/prisma/enums";
 // -------------------------
 // Create Task
 export const createTaskSchema = z.object({
-  projectId: z
-    .uuid("Invalid project ID format"),
-
-  createdBy: z
-    .string()
-    .min(1, "CreatedBy (user ID) is required"),
+  projectId: z.uuid("Invalid project ID format"),
 
   assignedTo: z
     .string()
@@ -32,16 +27,20 @@ export const createTaskSchema = z.object({
 
   dueDate: z
     .union([z.string(), z.date()])
-    .refine((date) => {
-      const d = typeof date === "string" ? Date.parse(date) : date.getTime();
-      return !isNaN(d);
-    }, { message: "Invalid due date" })
+    .refine(
+      (date) => {
+        const d = typeof date === "string" ? Date.parse(date) : date.getTime();
+        return !isNaN(d);
+      },
+      { message: "Invalid due date" },
+    )
     .optional(),
 });
 
 // -------------------------
 // Update Task (partial)
 export const updateTaskSchema = z.object({
+  projectId: z.uuid("Project ID is required for authorization"),
   title: z
     .string()
     .min(2, "Title must be at least 2 characters")
@@ -64,9 +63,12 @@ export const updateTaskSchema = z.object({
 
   dueDate: z
     .union([z.string(), z.date()])
-    .refine((date) => {
-      const d = typeof date === "string" ? Date.parse(date) : date.getTime();
-      return !isNaN(d);
-    }, { message: "Invalid due date" })
+    .refine(
+      (date) => {
+        const d = typeof date === "string" ? Date.parse(date) : date.getTime();
+        return !isNaN(d);
+      },
+      { message: "Invalid due date" },
+    )
     .optional(),
 });

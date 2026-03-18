@@ -11,6 +11,7 @@ export interface ICreateIncident {
 }
 
 export interface IUpdateIncidentStatus {
+  projectId: string;
   isResolved: boolean;
   resolutionNotes?: string;
 }

@@ -2,12 +2,7 @@ import { z } from "zod";
 import { RequestStatus } from "../../../generated/prisma/enums";
 
 export const createMaterialRequestSchema = z.object({
-  projectId: z
-    .string()
-    .min(1, "Project ID is required")
-    .uuid("Invalid project ID format"),
-
-  requestedBy: z.string().min(1, "RequestedBy (user ID) is required"),
+  projectId: z.uuid("Invalid project ID format"),
 
   itemName: z
     .string()
@@ -26,9 +21,8 @@ export const createMaterialRequestSchema = z.object({
 
 // Update Material Request Status
 export const updateMaterialRequestStatusSchema = z.object({
-  status: z.nativeEnum(RequestStatus), 
-
-  approvedBy: z.string().min(1, "ApprovedBy (user ID) is required").optional(),
+  projectId: z.uuid("Project ID is required for authorization"),
+  status: z.nativeEnum(RequestStatus),
 
   notes: z.string().max(500, "Notes must be at most 500 characters").optional(),
 

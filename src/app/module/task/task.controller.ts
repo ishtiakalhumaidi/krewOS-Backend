@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,8 +7,9 @@ import { TaskService } from "./task.service";
 
 const createTask = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.createdBy = (req as any).user.userId;
   const result = await TaskService.createTask(payload);
-  
+
   sendResponse(res, {
     statusCode: status.CREATED,
     success: true,
@@ -19,7 +21,7 @@ const createTask = catchAsync(async (req: Request, res: Response) => {
 const getProjectTasks = catchAsync(async (req: Request, res: Response) => {
   const { projectId } = req.params;
   const result = await TaskService.getProjectTasks(projectId as string);
-  
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
@@ -32,7 +34,7 @@ const updateTask = catchAsync(async (req: Request, res: Response) => {
   const { taskId } = req.params;
   const payload = req.body;
   const result = await TaskService.updateTask(taskId as string, payload);
-  
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,

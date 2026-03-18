@@ -6,8 +6,6 @@ export const createIncidentSchema = z.object({
   projectId: z
     .uuid("Invalid project ID format"),
 
-  reportedBy: z.string().min(1, "ReportedBy (user ID) is required"),
-
   title: z
     .string()
     .min(5, "Title must be at least 5 characters")

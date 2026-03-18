@@ -4,8 +4,7 @@ export const createProjectSchema = z
   .object({
     companyId: z.uuid("Invalid company ID format"),
 
-    ownerId: z.string().min(1, "Owner ID is required"),
-
+   
     name: z
       .string()
       .min(2, "Project name must be at least 2 characters")

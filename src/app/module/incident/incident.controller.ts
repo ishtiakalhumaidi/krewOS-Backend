@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -6,6 +7,7 @@ import { IncidentService } from "./incident.service";
 
 const createIncident = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+  payload.reportedBy = (req as any).user.userId;
   const result = await IncidentService.createIncident(payload);
 
   sendResponse(res, {
