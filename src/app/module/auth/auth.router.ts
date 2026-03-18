@@ -16,6 +16,8 @@ router.post(
   AuthController.registerPublicOwner,
 );
 
+router.post("/refresh-token", AuthController.getNewToken);
+
 router.post("/login", validateRequest(loginSchema), AuthController.loginUser);
 
 router.post(

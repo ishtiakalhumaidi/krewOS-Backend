@@ -4,6 +4,7 @@ import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AuthService } from "./auth.service";
 import { tokenUtils } from "../../utils/token";
+import AppError from "../../errorHelpers/AppError";
 
 const registerPublicOwner = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -89,9 +90,36 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getNewToken = catchAsync(async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken;
+  const betterAuthSessionToken = req.cookies["better-auth.session_token"];
+  if (!refreshToken) {
+    throw new AppError(status.UNAUTHORIZED, "Refresh token is missing.");
+  }
+  const result = await AuthService.getNewToken(
+    refreshToken,
+    betterAuthSessionToken,
+  );
+  const { accessToken, refreshToken: newRefreshToken, sessionToken } = result;
+  tokenUtils.setAccessTokenCookie(res, accessToken);
+  tokenUtils.setRefreshTokenCookie(res, newRefreshToken);
+  tokenUtils.setBetterAuthSessionCookie(res, sessionToken);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "new token generated successfully",
+    data: {
+      accessToken,
+      newRefreshToken,
+      sessionToken,
+    },
+  });
+});
 export const AuthController = {
   registerPublicOwner,
   sendInvite,
   registerInvitedMember,
   loginUser,
+  getNewToken,
 };

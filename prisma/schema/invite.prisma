@@ -1,0 +1,19 @@
+model Invite {
+  id        String       @id @default(uuid())
+  email     String
+  token     String       @unique
+  role      UserRole     // The role they will get when they join
+  
+  companyId String
+  company   Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  status    InviteStatus @default(PENDING)
+  expiresAt DateTime    
+  
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+
+  @@unique([email, companyId]) 
+  @@map("invite")
+}

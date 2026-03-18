@@ -87,3 +87,8 @@ enum CompanyStatus {
   SUSPENDED   // SUPER_ADMIN hit the kill switch (e.g., TOS violation)
   INACTIVE    // The company voluntarily canceled their account
 }
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}

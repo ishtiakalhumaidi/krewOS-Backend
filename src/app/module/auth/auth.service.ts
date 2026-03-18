@@ -3,7 +3,11 @@
 import status from "http-status";
 
 import { envVars } from "../../../config/env";
-import { UserRole } from "../../../generated/prisma/enums";
+import {
+  InviteStatus,
+  SubscriptionPlan,
+  UserRole,
+} from "../../../generated/prisma/enums";
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { inviteTemplate } from "../../shared/mailTemplates/inviteTemplate";
@@ -18,6 +22,7 @@ import AppError from "../../errorHelpers/AppError";
 import { tokenUtils } from "../../utils/token";
 import { jwtUtils } from "../../utils/jwt";
 import type { JwtPayload } from "jsonwebtoken";
+import { PLAN_LIMITS } from "../../../config/subscriptionLimits";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
@@ -74,69 +79,100 @@ const sendInvite = async (payload: IInviteWorker) => {
 
   const company = await prisma.company.findUnique({
     where: { id: companyId },
-    select: { name: true },
+    include: { subscription: true },
   });
 
   if (!company) {
     throw new AppError(status.NOT_FOUND, "Company not found");
   }
 
-  const token = tokenUtils.getAccessToken({ email, companyId, role });
+  // 🌟 1. SAAS QUOTA CHECK: Active users + Pending Invites
+  const [activeUsers, pendingInvites] = await Promise.all([
+    prisma.user.count({ where: { companyId, isDeleted: false } }),
+    prisma.invite.count({ where: { companyId, status: InviteStatus.PENDING } }),
+  ]);
 
-  const inviteLink = `${envVars.FRONTEND_URL}/join?token=${token}`;
+  const totalSeatsUsed = activeUsers + pendingInvites;
+  const currentPlan = company.subscription?.plan || SubscriptionPlan.FREE;
+  const limit = PLAN_LIMITS[currentPlan].maxMembers;
 
+  if (totalSeatsUsed >= limit) {
+    throw new AppError(
+      status.FORBIDDEN,
+      `Seat Limit Reached: Your ${currentPlan} plan is limited to ${limit} members.`,
+    );
+  }
+
+  // 🌟 2. Generate secure DB token (Expires in 7 days)
+  const token = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  const invite = await prisma.invite.upsert({
+    where: {
+      email_companyId: { email, companyId },
+    },
+    update: {
+      token,
+      role,
+      status: InviteStatus.PENDING,
+      expiresAt,
+    },
+    create: {
+      email,
+      token,
+      role,
+      companyId,
+      expiresAt,
+    },
+  });
+
+  // 3. Send Email
+  const inviteLink = `${envVars.FRONTEND_URL}/join?token=${invite.token}`;
   const htmlContent = inviteTemplate(role, inviteLink, company.name);
 
-  await sendEmail(email, "You are invited to join KrewOS", htmlContent);
+  await sendEmail(
+    email,
+    `You are invited to join ${company.name} on KrewOS`,
+    htmlContent,
+  );
 
-  return {
-    message: "Invite sent successfully",
-    inviteLink,
-  };
+  return { message: "Invite sent successfully", inviteLink };
 };
 
 const registerInvitedMember = async (payload: IRegisterMember) => {
   const { token, name, password } = payload;
 
-  // 1. Verify the Token (Don't just decode, verify the signature!)
-  let decoded: any;
-  try {
-    decoded = jwtUtils.verifyToken(token, envVars.ACCESS_TOKEN_SECRET) as {
-      success: boolean;
-      data: {
-        email: string;
-        companyId: string;
-        role: string;
-      };
-    };
-  } catch (err) {
+  // 🌟 1. Check the database for the token, not a JWT!
+  const invite = await prisma.invite.findUnique({
+    where: { token },
+  });
+
+  if (!invite) {
+    throw new AppError(status.NOT_FOUND, "Invalid invite link.");
+  }
+  if (invite.status !== InviteStatus.PENDING) {
     throw new AppError(
-      status.UNAUTHORIZED,
-      "Invalid, expired, or tampered invite token",
+      status.BAD_REQUEST,
+      "This invite link has already been used or canceled.",
     );
   }
-
-  if (
-    !decoded?.data?.email ||
-    !decoded?.data?.companyId ||
-    !decoded?.data?.role
-  ) {
-    throw new AppError(status.BAD_REQUEST, "Malformed invite token payload");
+  if (invite.expiresAt < new Date()) {
+    throw new AppError(status.BAD_REQUEST, "This invite link has expired.");
   }
 
-  // 2. Create the Auth User (BetterAuth)
+  // 2. Create Auth User using the email securely stored in the database
   let authUser;
   try {
     const data = await auth.api.signUpEmail({
       body: {
-        email: decoded.data.email,
+        email: invite.email, // Force them to use the email they were invited with!
         name,
         password,
       },
     });
 
-    if (!data?.user)
-      throw new Error("Authentication provider did not return user data");
+    if (!data?.user) throw new Error();
     authUser = data.user;
   } catch (err: any) {
     throw new AppError(
@@ -144,50 +180,43 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
       `Failed to create account: ${err.message}`,
     );
   }
-  try {
-    const formattedRole = decoded.data.role.toUpperCase() as UserRole;
 
-    await prisma.user.update({
-      where: { id: authUser.id },
-      data: {
-        companyId: decoded.data.companyId,
-        role: formattedRole,
-        isActive: true,
-        emailVerified: true,
-      },
+  // 3. Transaction: Update user and mark invite as USED
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Assign the user to the company
+      await tx.user.update({
+        where: { id: authUser.id },
+        data: {
+          companyId: invite.companyId,
+          role: invite.role,
+          isActive: true,
+          emailVerified: true,
+        },
+      });
+
+      // Mark the invite so it can't be used twice!
+      await tx.invite.update({
+        where: { id: invite.id },
+        data: { status: InviteStatus.ACCEPTED },
+      });
     });
   } catch (err: any) {
-    console.error("🔥 PRISMA UPDATE FAILED:", err);
-
-    try {
-      await prisma.user.delete({ where: { id: authUser.id } });
-    } catch (rollbackErr) {
-      console.error(
-        "🚨 CRITICAL: Failed to rollback orphaned user!",
-        rollbackErr,
-      );
-    }
-
-    if (err.code === "P2003") {
-      throw new AppError(
-        status.BAD_REQUEST,
-        "The company associated with this invite no longer exists.",
-      );
-    }
-
+    // Rollback user if it fails
+    await prisma.user.delete({ where: { id: authUser.id } }).catch(() => {});
     throw new AppError(
       status.INTERNAL_SERVER_ERROR,
-      `Database assignment failed: ${err.message}`,
+      "Database assignment failed",
     );
   }
 
-  const formattedRole = decoded.data.role.toUpperCase();
-
+  // 4. Generate Session Tokens
   const tokenPayload = {
     userId: authUser.id,
-    role: formattedRole,
+    role: invite.role,
     name: authUser.name,
     email: authUser.email,
+    companyId: invite.companyId,
     isDelete: false,
     emailVerified: true,
   };
@@ -196,15 +225,12 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
   const refreshToken = tokenUtils.getRefreshToken(tokenPayload);
 
   return {
-    user: {
-      ...authUser,
-      role: formattedRole,
-      companyId: decoded.data.companyId,
-    },
+    user: { ...authUser, role: invite.role, companyId: invite.companyId },
     accessToken,
     refreshToken,
   };
 };
+
 const loginUser = async (payload: ILoginUser) => {
   const { email, password } = payload;
 
@@ -254,6 +280,18 @@ const loginUser = async (payload: ILoginUser) => {
 };
 
 const getNewToken = async (refreshToken: string, sessionToken: string) => {
+  const isSessionExists = await prisma.session.findUnique({
+    where: {
+      token: sessionToken,
+    },
+    include: {
+      user: true,
+    },
+  });
+  if (!isSessionExists) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid session token");
+  }
+
   const verifiedRefreshToken = jwtUtils.verifyToken(
     refreshToken,
     envVars.REFRESH_TOKEN_SECRET,
@@ -265,25 +303,36 @@ const getNewToken = async (refreshToken: string, sessionToken: string) => {
   const data = verifiedRefreshToken.data as JwtPayload;
 
   const newAccessToken = tokenUtils.getAccessToken({
-    userId: data.user.id,
-    role: data.user.role,
-    name: data.user.name,
-    email: data.user.email,
-    isDelete: data.user.isDeleted,
-    emailVerified: data.user.emailVerified,
+    userId: data.userId,
+    role: data.role,
+    name: data.name,
+    email: data.email,
+    isDelete: data.isDeleted,
+    emailVerified: data.emailVerified,
   });
   const newRefreshToken = tokenUtils.getRefreshToken({
-    userId: data.user.id,
-    role: data.user.role,
-    name: data.user.name,
-    email: data.user.email,
-    isDelete: data.user.isDeleted,
-    emailVerified: data.user.emailVerified,
+    userId: data.userId,
+    role: data.role,
+    name: data.name,
+    email: data.email,
+    isDelete: data.isDeleted,
+    emailVerified: data.emailVerified,
   });
 
+  const { token } = await prisma.session.update({
+    where: {
+      token: sessionToken,
+    },
+    data: {
+      token: sessionToken,
+      expiresAt: new Date(Date.now() + 60 * 60 * 60 * 24 * 1000),
+      updatedAt: new Date(),
+    },
+  });
   return {
     accessToken: newAccessToken,
     refreshToken: newRefreshToken,
+    sessionToken: token,
   };
 };
 
@@ -292,4 +341,5 @@ export const AuthService = {
   registerInvitedMember,
   sendInvite,
   loginUser,
+  getNewToken,
 };
