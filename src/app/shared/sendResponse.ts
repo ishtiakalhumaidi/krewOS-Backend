@@ -4,7 +4,7 @@ interface IResponseData<T> {
   statusCode: number;
   success: boolean;
   message: string;
-  data: T;
+  data?: T;
 }
 export const sendResponse = <T>(
   res: Response,

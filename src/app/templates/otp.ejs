@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your One-Time Password</title>
+</head>
+
+<body style="
+  margin:0;
+  padding:0;
+  background-color:#eef2f7;
+  font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+">
+
+  <!-- Preheader -->
+  <div style="
+    display:none;
+    max-height:0;
+    overflow:hidden;
+    font-size:1px;
+    line-height:1px;
+    color:#eef2f7;
+  ">
+    Your secure one-time password for account verification.
+  </div>
+
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="padding:40px 16px; background:#eef2f7;">
+    <tr>
+      <td align="center">
+
+        <!-- Card -->
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
+          style="
+            max-width:520px;
+            background:#ffffff;
+            border-radius:8px;
+            overflow:hidden;
+            box-shadow:0 12px 28px rgba(15,23,42,0.08);
+          ">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#0b1020; padding:32px 36px;">
+              <div style="font-size:20px; font-weight:700; color:#ffffff;">
+                krew<span style="color:#60a5fa;">OS</span>
+              </div>
+              <div style="
+                margin-top:6px;
+                font-size:10px;
+                letter-spacing:2.5px;
+                text-transform:uppercase;
+                color:#94a3b8;
+              ">
+                Secure Access Verification
+              </div>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:36px;">
+
+              <h2 style="
+                margin:0 0 16px;
+                font-size:22px;
+                font-weight:700;
+                color:#020617;
+              ">
+                Hello <%= name %>,
+              </h2>
+
+              <p style="
+                margin:0 0 24px;
+                font-size:15px;
+                line-height:1.7;
+                color:#475569;
+              ">
+                Use the one-time password below to complete your verification.
+                This code is valid for a limited time.
+              </p>
+
+              <!-- OTP Box -->
+              <table width="100%" role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0;">
+                <tr>
+                  <td align="center" style="
+                    background:#f8fafc;
+                    border:1px solid #e2e8f0;
+                    border-radius:8px;
+                    padding:22px;
+                  ">
+                    <div style="
+                      font-size:11px;
+                      letter-spacing:2px;
+                      text-transform:uppercase;
+                      color:#64748b;
+                      margin-bottom:8px;
+                    ">
+                      Your OTP
+                    </div>
+                    <div style="
+                      font-size:28px;
+                      letter-spacing:6px;
+                      font-weight:700;
+                      color:#1d4ed8;
+                    ">
+                      <%= otp %>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="
+                margin:0;
+                font-size:14px;
+                line-height:1.6;
+                color:#64748b;
+              ">
+                This code will expire in <strong>2 minutes</strong>.
+                If you did not request this code, please ignore this email.
+              </p>
+
+              <!-- Security Notice -->
+              <table width="100%" role="presentation" cellpadding="0" cellspacing="0" style="margin-top:28px;">
+                <tr>
+                  <td style="
+                    background:#fff7ed;
+                    border:1px solid #fed7aa;
+                    border-radius:8px;
+                    padding:16px 18px;
+                  ">
+                    <p style="
+                      margin:0;
+                      font-size:13px;
+                      line-height:1.6;
+                      color:#92400e;
+                    ">
+                      <strong>Security notice:</strong><br>
+                      Never share your OTP with anyone. KrewOS staff will never
+                      ask for your verification code.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="
+              background:#f8fafc;
+              border-top:1px solid #e2e8f0;
+              padding:22px 36px;
+            ">
+              <div style="font-size:11px; color:#64748b;">
+                © 2026 KrewOS. All rights reserved.
+              </div>
+              <div style="font-size:11px; color:#94a3b8; margin-top:4px;">
+                This is an automated security message. Please do not reply.
+              </div>
+            </td>
+          </tr>
+
+        </table>
+        <!-- /Card -->
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

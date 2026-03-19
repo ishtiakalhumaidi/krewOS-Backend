@@ -3,7 +3,7 @@ import { ProjectRole, SubscriptionPlan } from "../../../generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { ICreateProject } from "./project.interface";
-import { PLAN_LIMITS } from "../../../config/subscriptionLimits";
+import { PLAN_LIMITS } from "../../config/subscriptionLimits";
 
 const createProject = async (payload: ICreateProject) => {
   // 1. Get the company and count their current projects

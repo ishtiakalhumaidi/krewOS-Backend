@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 
-import { envVars } from "../../../config/env";
+import { envVars } from "../../config/env";
 import {
   InviteStatus,
   SubscriptionPlan,
@@ -11,8 +11,9 @@ import {
 import { auth } from "../../lib/auth";
 import { prisma } from "../../lib/prisma";
 import { inviteTemplate } from "../../shared/mailTemplates/inviteTemplate";
-import { sendEmail } from "../../shared/sendEmail";
+import { sendEmailVersion2 } from "../../shared/sendEmail";
 import type {
+  IChangePasswordPayload,
   IInviteWorker,
   ILoginUser,
   IPublicRegister,
@@ -22,7 +23,8 @@ import AppError from "../../errorHelpers/AppError";
 import { tokenUtils } from "../../utils/token";
 import { jwtUtils } from "../../utils/jwt";
 import type { JwtPayload } from "jsonwebtoken";
-import { PLAN_LIMITS } from "../../../config/subscriptionLimits";
+import { PLAN_LIMITS } from "../../config/subscriptionLimits";
+import { date } from "zod";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
@@ -103,10 +105,10 @@ const sendInvite = async (payload: IInviteWorker) => {
     );
   }
 
-  // 🌟 2. Generate secure DB token (Expires in 7 days)
+  // 🌟 2. Generate secure DB token (Expires in 2 days)
   const token = crypto.randomUUID();
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7);
+  expiresAt.setDate(expiresAt.getDate() + 2);
 
   const invite = await prisma.invite.upsert({
     where: {
@@ -129,13 +131,18 @@ const sendInvite = async (payload: IInviteWorker) => {
 
   // 3. Send Email
   const inviteLink = `${envVars.FRONTEND_URL}/join?token=${invite.token}`;
-  const htmlContent = inviteTemplate(role, inviteLink, company.name);
 
-  await sendEmail(
-    email,
-    `You are invited to join ${company.name} on KrewOS`,
-    htmlContent,
-  );
+  await sendEmailVersion2({
+    to: email,
+    subject: `You are invited to join ${company.name} on KrewOS`,
+    templateName: "sendInvite",
+    templateData: {
+      inviteLink,
+      expiresIn: "48 Hours",
+      company: company.name,
+      role,
+    },
+  });
 
   return { message: "Invite sent successfully", inviteLink };
 };
@@ -143,7 +150,6 @@ const sendInvite = async (payload: IInviteWorker) => {
 const registerInvitedMember = async (payload: IRegisterMember) => {
   const { token, name, password } = payload;
 
-  // 🌟 1. Check the database for the token, not a JWT!
   const invite = await prisma.invite.findUnique({
     where: { token },
   });
@@ -151,29 +157,55 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
   if (!invite) {
     throw new AppError(status.NOT_FOUND, "Invalid invite link.");
   }
+
   if (invite.status !== InviteStatus.PENDING) {
     throw new AppError(
       status.BAD_REQUEST,
-      "This invite link has already been used or canceled.",
+      "This invite link already used or canceled.",
     );
   }
+
   if (invite.expiresAt < new Date()) {
-    throw new AppError(status.BAD_REQUEST, "This invite link has expired.");
+    throw new AppError(status.BAD_REQUEST, "Invite expired.");
   }
 
-  // 2. Create Auth User using the email securely stored in the database
+  // Prevent duplicate user creation
+  const existingUser = await prisma.user.findUnique({
+    where: { email: invite.email },
+  });
+
+  if (existingUser) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "User already exists with this email",
+    );
+  }
+
   let authUser;
+  let sessionToken;
+
   try {
     const data = await auth.api.signUpEmail({
       body: {
-        email: invite.email, // Force them to use the email they were invited with!
+        email: invite.email,
         name,
         password,
       },
     });
 
-    if (!data?.user) throw new Error();
+    if (!data?.user) {
+      throw new Error("Auth user creation failed");
+    }
+
     authUser = data.user;
+    sessionToken = data.token;
+
+    await prisma.user.update({
+      where: { id: authUser.id },
+      data: {
+        emailVerified: true,
+      },
+    });
   } catch (err: any) {
     throw new AppError(
       status.BAD_REQUEST,
@@ -181,36 +213,34 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
     );
   }
 
-  // 3. Transaction: Update user and mark invite as USED
   try {
     await prisma.$transaction(async (tx) => {
-      // Assign the user to the company
       await tx.user.update({
         where: { id: authUser.id },
         data: {
           companyId: invite.companyId,
           role: invite.role,
           isActive: true,
-          emailVerified: true,
         },
       });
 
-      // Mark the invite so it can't be used twice!
       await tx.invite.update({
         where: { id: invite.id },
-        data: { status: InviteStatus.ACCEPTED },
+        data: {
+          status: InviteStatus.ACCEPTED,
+        },
       });
     });
   } catch (err: any) {
-    // Rollback user if it fails
+    //rollback user if company assignment fails
     await prisma.user.delete({ where: { id: authUser.id } }).catch(() => {});
+
     throw new AppError(
       status.INTERNAL_SERVER_ERROR,
       "Database assignment failed",
     );
   }
 
-  // 4. Generate Session Tokens
   const tokenPayload = {
     userId: authUser.id,
     role: invite.role,
@@ -222,10 +252,16 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
   };
 
   const accessToken = tokenUtils.getAccessToken(tokenPayload);
+
   const refreshToken = tokenUtils.getRefreshToken(tokenPayload);
 
   return {
-    user: { ...authUser, role: invite.role, companyId: invite.companyId },
+    user: {
+      ...authUser,
+      role: invite.role,
+      companyId: invite.companyId,
+    },
+    token: sessionToken,
     accessToken,
     refreshToken,
   };
@@ -336,10 +372,187 @@ const getNewToken = async (refreshToken: string, sessionToken: string) => {
   };
 };
 
+const changePassword = async (
+  payload: IChangePasswordPayload,
+  sessionToken: string,
+) => {
+  const session = await auth.api.getSession({
+    headers: new Headers({
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
+  if (!session) {
+    throw new AppError(status.UNAUTHORIZED, "Invalid session token");
+  }
+  const { currentPassword, newPassword } = payload;
+
+  const result = await auth.api.changePassword({
+    body: {
+      currentPassword,
+      newPassword,
+      revokeOtherSessions: true,
+    },
+    headers: new Headers({
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
+
+  const accessToken = tokenUtils.getAccessToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    isDelete: session.user.isDeleted,
+    emailVerified: session.user.emailVerified,
+  });
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+    email: session.user.email,
+    isDelete: session.user.isDeleted,
+    emailVerified: session.user.emailVerified,
+  });
+
+  return { ...result, accessToken, refreshToken };
+};
+
+const logoutUser = async (sessionToken: string) => {
+  const result = await auth.api.signOut({
+    headers: {
+      Authorization: `Bearer ${sessionToken}`,
+    },
+  });
+  return result;
+};
+
+const verifyEmail = async (email: string, otp: string) => {
+  const result = await auth.api.verifyEmailOTP({
+    body: {
+      email,
+      otp,
+    },
+  });
+  if (result.status && !result.user.emailVerified) {
+    await prisma.user.update({
+      where: {
+        email,
+      },
+      data: {
+        emailVerified: true,
+      },
+    });
+  }
+  return result;
+};
+
+const forgetPassword = async (email: string) => {
+  const isUserExists = await prisma.user.findUnique({
+    where: {
+      email,
+    },
+  });
+
+  if (!isUserExists) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+  if (!isUserExists.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
+  }
+  if (!isUserExists.isActive || isUserExists.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  await auth.api.requestPasswordResetEmailOTP({
+    body: {
+      email,
+    },
+  });
+};
+
+const resetPassword = async (
+  email: string,
+  otp: string,
+  newPassword: string,
+) => {
+  const isUserExists = await prisma.user.findUnique({
+    where: {
+      email,
+    },
+  });
+
+  if (!isUserExists) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+  if (!isUserExists.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
+  }
+  if (!isUserExists.isActive || isUserExists.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+  await auth.api.resetPasswordEmailOTP({
+    body: {
+      email,
+      otp,
+      password: newPassword,
+    },
+  });
+  await prisma.session.deleteMany({
+    where: {
+      userId: isUserExists.id,
+    },
+  });
+};
+
+//! this is for letter use and learn purpose for any other app use.... we will not allow social login for this platform for security purpose...
+
+const googleLoginSuccess = async (session: Record<string, any>) => {
+  const isOwnerExists = await prisma.user.findUnique({
+    where: {
+      id: session.user.id,
+    },
+  });
+  if (isOwnerExists?.companyId === null) {
+    const companyName = `${isOwnerExists.name} Workplace`;
+    const slug =
+      companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now();
+    const newCompany = await prisma.company.create({
+      data: { name: companyName, slug },
+    });
+
+    await prisma.user.update({
+      where: {
+        id: session.user.id,
+      },
+      data: {
+        companyId: newCompany.id,
+      },
+    });
+  }
+  const accessToken = tokenUtils.getAccessToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+  });
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+  });
+
+  return { accessToken, refreshToken };
+};
+
 export const AuthService = {
   registerPublicOwner,
   registerInvitedMember,
   sendInvite,
   loginUser,
   getNewToken,
+  changePassword,
+  logoutUser,
+  verifyEmail,
+  forgetPassword,
+  resetPassword,
+  googleLoginSuccess,
 };

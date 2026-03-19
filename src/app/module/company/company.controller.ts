@@ -27,6 +27,8 @@ const getCompanyById = catchAsync(async (req: Request, res: Response) => {
 
 const updateCompany = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
+  req.body.logoUrl = req.file?.path;
+
   const result = await CompanyService.updateCompany(id as string, req.body);
   sendResponse(res, {
     statusCode: status.OK,

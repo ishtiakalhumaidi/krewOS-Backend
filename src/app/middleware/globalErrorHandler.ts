@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { NextFunction, Request, Response } from "express";
-import { envVars } from "../../config/env";
+import { envVars } from "../config/env";
 import z from "zod";
 import type {
   TErrorResponse,
@@ -10,8 +10,9 @@ import type {
 import { handleZodError } from "../errorHelpers/handleZodError";
 import status from "http-status";
 import AppError from "../errorHelpers/AppError";
+import { deleteFileFormCloudinary } from "../config/cloudinary.config";
 
-export const globalErrorHandler = (
+export const globalErrorHandler = async (
   err: any,
   req: Request,
   res: Response,
@@ -20,6 +21,15 @@ export const globalErrorHandler = (
   if (envVars.NODE_ENV === "development") {
     console.error("Error:", err);
   }
+
+  if (req.file) {
+    await deleteFileFormCloudinary(req.file.path);
+  }
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    const imageUrls = req.files.map((file) => file.path);
+    await Promise.all(imageUrls.map((url) => deleteFileFormCloudinary(url)));
+  }
+
   let errorSources: TErrorSources[] = [];
   let statusCode: number = 500;
   let message: string = "Internal Server Error";

@@ -6,7 +6,7 @@ import AppError from "../errorHelpers/AppError";
 import status from "http-status";
 import { prisma } from "../lib/prisma";
 import { jwtUtils } from "../utils/jwt";
-import { envVars } from "../../config/env";
+import { envVars } from "../config/env";
 
 export const checkAuth =
   (...authRoles: UserRole[]) =>

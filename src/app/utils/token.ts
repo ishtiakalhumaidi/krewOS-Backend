@@ -1,6 +1,6 @@
 import type { JwtPayload, SignOptions } from "jsonwebtoken";
 import { jwtUtils } from "./jwt";
-import { envVars } from "../../config/env";
+import { envVars } from "../config/env";
 import type { Response } from "express";
 import { cookieUtils } from "./cookie";
 
@@ -53,7 +53,7 @@ const setBetterAuthSessionCookie = (res: Response, token: string) => {
     sameSite: "none",
     path: "/",
     //1d
-    maxAge:  24 * 60 * 60 * 1000,
+    maxAge: 24 * 60 * 60 * 1000,
   });
 };
 

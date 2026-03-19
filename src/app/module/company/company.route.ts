@@ -2,6 +2,9 @@ import { Router } from "express";
 import { CompanyController } from "./company.controller";
 import { checkAuth } from "../../middleware/checkAuth";
 import { UserRole } from "../../../generated/prisma/enums";
+import { multerUpload } from "../../config/multer.config";
+import { validateRequest } from "../../middleware/validateRequest";
+import { updateCompanySchema } from "./company.validation";
 
 const router = Router();
 
@@ -30,6 +33,8 @@ router.get(
 router.patch(
   "/:id",
   checkAuth(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN),
+  multerUpload.single("file"),
+  validateRequest(updateCompanySchema),
   CompanyController.updateCompany,
 );
 
