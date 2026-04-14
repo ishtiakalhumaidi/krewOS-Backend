@@ -4,6 +4,7 @@ import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { ICreateProject } from "./project.interface";
 import { PLAN_LIMITS } from "../../config/subscriptionLimits";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
 const createProject = async (payload: ICreateProject) => {
   // 1. Get the company and count their current projects
@@ -52,21 +53,31 @@ const createProject = async (payload: ICreateProject) => {
   });
 };
 
-const getCompanyProjects = async (companyId: string) => {
-  const result = await prisma.project.findMany({
-    where: { companyId },
-    orderBy: { createdAt: "desc" },
-
-    include: {
+const getCompanyProjects = async (companyId: string, query: Record<string, unknown>) => {
+  const projectQuery = new QueryBuilder(
+    prisma.project, 
+    query, 
+    {
+      searchableFields: ['name', 'description'],
+      filterableFields: ['status'],
+    }
+  )
+    .search()
+    .filter()
+    .where({ companyId }) 
+    .paginate()
+    .sort()
+    .include({
       owner: true,
       company: true,
-
       _count: {
         select: { members: true, tasks: true },
       },
-    },
-  });
-  return result;
+    });
+
+  // execute() returns { data, meta }
+  const result = await projectQuery.execute();
+  return result; 
 };
 
 export const ProjectService = {

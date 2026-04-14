@@ -15,6 +15,12 @@ const app: Application = express();
 app.set("view engine", "ejs");
 app.set("views", path.resolve(process.cwd(), `src/app/templates/`));
 
+app.post("/webhook", express.raw({ type: "application/json" }), (req, res) => {
+  // Handle the webhook event here
+  console.log("Received webhook event:", req.body);
+  res.status(200).json({ received: true });
+});
+
 app.use(
   cors({
     origin: [

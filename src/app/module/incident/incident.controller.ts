@@ -7,6 +7,10 @@ import { IncidentService } from "./incident.service";
 
 const createIncident = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
+
+  if (req.files && Array.isArray(req.files)) {
+    payload.photoUrls = req.files.map((file: any) => file.path);
+  }
   payload.reportedBy = (req as any).user.userId;
   const result = await IncidentService.createIncident(payload);
 

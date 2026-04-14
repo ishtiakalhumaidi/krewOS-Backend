@@ -10,6 +10,7 @@ import { IncidentRoutes } from "../module/incident/incident.route";
 import { SafetyChecklistRoutes } from "../module/safety-checklist/safety-checklist.route";
 import { CompanyRoutes } from "../module/company/company.route";
 import { AdminRoutes } from "../module/admin/admin.route";
+import { BillingRoutes } from "../module/billing/billing.route";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use("/material-requests", MaterialRequestRoutes);
 router.use("/incidents", IncidentRoutes);
 router.use("/safety-checklists", SafetyChecklistRoutes);
 router.use("/admin", AdminRoutes);
+router.use("/billing", BillingRoutes);
 
 export const IndexRouter = router;

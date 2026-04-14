@@ -20,13 +20,16 @@ const createTask = catchAsync(async (req: Request, res: Response) => {
 
 const getProjectTasks = catchAsync(async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const result = await TaskService.getProjectTasks(projectId as string);
+  
+  
+  const result = await TaskService.getProjectTasks(projectId as string, req.query);
 
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "Project tasks retrieved successfully",
-    data: result,
+    message: "Tasks retrieved successfully",
+    meta: result.meta, // Add pagination metadata
+    data: result.data,
   });
 });
 

@@ -20,13 +20,19 @@ const createProject = catchAsync(async (req: Request, res: Response) => {
 
 const getCompanyProjects = catchAsync(async (req: Request, res: Response) => {
   const { companyId } = req.params;
-  const result = await ProjectService.getCompanyProjects(companyId as string);
+
+  // Pass req.query to the service
+  const result = await ProjectService.getCompanyProjects(
+    companyId as string,
+    req.query,
+  );
 
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
     message: "Projects retrieved successfully",
-    data: result,
+    meta: result.meta, // Now your response will include page, limit, total, totalPages
+    data: result.data,
   });
 });
 

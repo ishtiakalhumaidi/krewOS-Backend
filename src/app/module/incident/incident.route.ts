@@ -8,6 +8,7 @@ import {
   createIncidentSchema,
   updateIncidentStatusSchema,
 } from "./incident.validation";
+import { multerUpload } from "../../config/multer.config";
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.patch(
     ProjectRole.SITE_MANAGER,
     ProjectRole.SAFETY_OFFICER,
   ),
+  multerUpload.array("photos", 5),
   validateRequest(updateIncidentStatusSchema),
   IncidentController.resolveIncident,
 );

@@ -19,7 +19,7 @@ interface EnvConfig {
   SMTP_PASS: string;
 
   STRIPE_SECRET_KEY: string;
-  STRIPE_PUBLISHABLE_KEY: string;
+  STRIPE_WEBHOOK_SECRET: string;
 
   ACCESS_TOKEN_SECRET: string;
   REFRESH_TOKEN_SECRET: string;
@@ -54,7 +54,7 @@ const loadEnv = (): EnvConfig => {
     "SMTP_USER",
     "SMTP_PASS",
 
-    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
     "STRIPE_SECRET_KEY",
 
     "ACCESS_TOKEN_SECRET",
@@ -97,7 +97,7 @@ const loadEnv = (): EnvConfig => {
     SMTP_USER: process.env.SMTP_USER as string,
     SMTP_PASS: process.env.SMTP_PASS as string,
 
-    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY as string,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_PUBLISHABLE_KEY as string,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY as string,
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET as string,

@@ -1,4 +1,5 @@
 import { prisma } from "../../lib/prisma";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 import type { ICreateTask, IUpdateTask } from "./task.interface";
 
 const createTask = async (payload: ICreateTask) => {
@@ -21,20 +22,30 @@ const createTask = async (payload: ICreateTask) => {
   return result;
 };
 
-const getProjectTasks = async (projectId: string) => {
-  const result = await prisma.task.findMany({
-    where: { projectId },
-    orderBy: { createdAt: 'desc' },
-    include: {
+const getProjectTasks = async (projectId: string, query: Record<string, unknown>) => {
+  const taskQuery = new QueryBuilder(
+    prisma.task, 
+    query, 
+    {
+      searchableFields: ['title', 'description'], // Adjust fields based on your schema
+      filterableFields: ['status', 'priority', 'assigneeId'], // Allow users to filter tasks
+    }
+  )
+    .search()
+    .filter()
+    .where({ projectId }) // Must belong to the project
+    .paginate()
+    .sort()
+    .include({
       assignee: {
         select: { id: true, name: true, email: true }
       },
       creator: {
         select: { id: true, name: true }
       }
-    }
-  });
-  return result;
+    });
+
+  return await taskQuery.execute();
 };
 
 const updateTask = async (taskId: string, payload: IUpdateTask) => {
