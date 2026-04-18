@@ -30,6 +30,11 @@ router.post(
 
 router.post(
   "/invite",
+  checkAuth(
+    UserRole.ADMIN,
+    UserRole.OWNER,
+    UserRole.SUPER_ADMIN,
+  ),
   validateRequest(createCompanyMember),
   //   requireAuth,
   //   requireCompanyRole(["OWNER", "ADMIN"]),
@@ -55,7 +60,7 @@ router.post(
   ),
   AuthController.logoutUser,
 );
-
+router.post("/resend-verification", AuthController.resendVerificationCode);
 router.post("/verify-email", AuthController.verifyEmail);
 router.post("/forget-password", AuthController.forgetPassword);
 router.post("/reset-password", AuthController.resetPassword);

@@ -25,6 +25,12 @@ router.get(
   TaskController.getProjectTasks,
 );
 
+// 👀 ANY project member can view their own tasks across all projects
+router.get(
+  "/my-tasks",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  TaskController.getMyTasks,
+);
 // 👷 ANY project member can update a task (e.g., mark as IN_PROGRESS or DONE)
 router.patch(
   "/:taskId",
@@ -32,6 +38,13 @@ router.patch(
   checkProjectRole(), 
   validateRequest(updateTaskSchema),
   TaskController.updateTask,
+);
+
+router.delete(
+  "/:taskId",
+  checkAuth(UserRole.OWNER, UserRole.MEMBER),
+  checkProjectRole(ProjectRole.PROJECT_MANAGER, ProjectRole.SITE_MANAGER),
+  TaskController.deleteTask,
 );
 
 export const TaskRoutes = router;

@@ -30,8 +30,8 @@ export const createCompanyMember = z.object({
     message: "Role must be ADMIN, MEMBER or MANAGER",
   }),
 
-  companyId: z
-    .uuid("Invalid company ID format"),
+  // companyId: z
+  //   .uuid("Invalid company ID format"),
 });
 
 

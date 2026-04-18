@@ -16,6 +16,7 @@ const router = Router();
 router.post(
   "/",
   checkAuth(UserRole.OWNER, UserRole.MEMBER),
+  multerUpload.array("photos", 5),
   checkProjectRole(),
   validateRequest(createIncidentSchema),
   IncidentController.createIncident,
@@ -28,17 +29,22 @@ router.get(
   checkProjectRole(),
   IncidentController.getProjectIncidents,
 );
+router.get(
+  "/my-reports",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  IncidentController.getMyIncidents,
+);
 
 // 🛡️ ONLY Managers & Safety Officers can resolve an incident
 router.patch(
   "/:incidentId/resolve",
   checkAuth(UserRole.OWNER, UserRole.MEMBER),
+  multerUpload.array("photos", 5),
   checkProjectRole(
     ProjectRole.PROJECT_MANAGER,
     ProjectRole.SITE_MANAGER,
     ProjectRole.SAFETY_OFFICER,
   ),
-  multerUpload.array("photos", 5),
   validateRequest(updateIncidentStatusSchema),
   IncidentController.resolveIncident,
 );

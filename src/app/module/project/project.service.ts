@@ -80,7 +80,60 @@ const getCompanyProjects = async (companyId: string, query: Record<string, unkno
   return result; 
 };
 
+const getMyProjects = async (userId: string, query: Record<string, unknown>) => {
+  const projectQuery = new QueryBuilder(
+    prisma.project, 
+    query, 
+    {
+      searchableFields: ['name', 'location', 'description'],
+      filterableFields: ['status'],
+    }
+  )
+    .search()
+    .filter()
+    .where({
+      // 👉 The Magic Filter: Only return projects where this user is a member!
+      members: {
+        some: { userId }
+      }
+    }) 
+    .paginate()
+    .sort()
+    .include({
+      owner: { select: { name: true, email: true } },
+      _count: {
+        select: { members: true, tasks: true },
+      },
+    });
+
+  return await projectQuery.execute(); 
+};
+const getProjectById = async (projectId: string, companyId: string) => {
+  const project = await prisma.project.findFirst({
+    where: {
+      id: projectId,
+      companyId: companyId,
+    },
+    include: {
+  
+      owner: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+      
+    },
+  });
+
+  if (!project) {
+    throw new AppError(status.NOT_FOUND, "Project not found or you do not have permission to view it.");
+  }
+
+  return project;
+};
 export const ProjectService = {
   createProject,
-  getCompanyProjects,
+  getCompanyProjects,getProjectById,
+  getMyProjects,
 };

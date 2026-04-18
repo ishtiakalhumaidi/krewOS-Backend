@@ -1,81 +1,58 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
-import { prisma } from "../../lib/prisma";
-import type {
-  ICreateMaterialRequest,
-  IUpdateMaterialRequestStatus,
-} from "./material-request.interface";
 import AppError from "../../errorHelpers/AppError";
+import { prisma } from "../../lib/prisma";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
-const createRequest = async (payload: ICreateMaterialRequest) => {
-  // Ensure the worker is on the project
+const createRequest = async (payload: any) => {
+  // Ensure worker is on the project
   const isMember = await prisma.projectMember.findUnique({
-    where: {
-      projectId_userId: {
-        projectId: payload.projectId,
-        userId: payload.requestedBy,
-      },
-    },
+    where: { projectId_userId: { projectId: payload.projectId, userId: payload.requestedBy } }
   });
 
-  if (!isMember) {
-    throw new AppError(
-      status.FORBIDDEN,
-      "You must be assigned to this project to request materials",
-    );
-  }
+  if (!isMember) throw new AppError(status.FORBIDDEN, "You must be assigned to this project to request materials");
 
-  // Create the request
-  const result = await prisma.materialRequest.create({
+  return await prisma.materialRequest.create({
     data: {
       projectId: payload.projectId,
       requestedBy: payload.requestedBy,
       itemName: payload.itemName,
-      quantity: payload.quantity,
+      quantity: Number(payload.quantity),
       unit: payload.unit,
       notes: payload.notes,
-    },
-    include: {
-      requester: { select: { name: true, email: true } },
-    },
+    }
   });
+};
 
-  return result;
+const getMyRequests = async (userId: string, query: Record<string, unknown>) => {
+  const requestQuery = new QueryBuilder(prisma.materialRequest, query, {
+    searchableFields: ['itemName', 'notes'],
+    filterableFields: ['status', 'projectId'],
+  })
+    .search().filter().where({ requestedBy: userId }).paginate().sort()
+    .include({ project: { select: { name: true } } });
+
+  return await requestQuery.execute();
 };
 
 const getProjectRequests = async (projectId: string) => {
-  const result = await prisma.materialRequest.findMany({
+  return await prisma.materialRequest.findMany({
     where: { projectId },
-    include: {
-      requester: true,
-      approver: true,
-    },
+    include: { requester: { select: { name: true } }, approver: { select: { name: true } } },
     orderBy: { createdAt: "desc" },
   });
-  return result;
 };
 
-const updateRequestStatus = async (
-  requestId: string,
-  payload: IUpdateMaterialRequestStatus,
-) => {
-  const result = await prisma.materialRequest.update({
+const updateStatus = async (requestId: string, payload: any) => {
+  const dataToUpdate: any = { status: payload.status };
+  
+  if (payload.approvedBy) dataToUpdate.approvedBy = payload.approvedBy;
+  if (payload.deliveryPhotoUrl) dataToUpdate.deliveryPhotoUrl = payload.deliveryPhotoUrl;
+
+  return await prisma.materialRequest.update({
     where: { id: requestId },
-    data: {
-      status: payload.status,
-      approvedBy: payload.approvedBy,
-      notes: payload.notes,
-      deliveryPhotoUrl: payload.deliveryPhotoUrl,
-    },
-    include: {
-      approver: { select: { name: true } },
-    },
+    data: dataToUpdate,
   });
-
-  return result;
 };
 
-export const MaterialRequestService = {
-  createRequest,
-  getProjectRequests,
-  updateRequestStatus,
-};
+export const MaterialService = { createRequest, getMyRequests, getProjectRequests, updateStatus };

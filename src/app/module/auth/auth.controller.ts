@@ -36,8 +36,8 @@ const registerPublicOwner = catchAsync(async (req: Request, res: Response) => {
 
 const sendInvite = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
-  // TODO: If you have a middleware setting req.user, you can inject companyId here:
-  // payload.companyId = req.user.companyId;
+
+  payload.companyId = req.user.companyId;
 
   const result = await AuthService.sendInvite(payload);
 
@@ -52,6 +52,7 @@ const sendInvite = catchAsync(async (req: Request, res: Response) => {
 const registerInvitedMember = catchAsync(
   async (req: Request, res: Response) => {
     const result = await AuthService.registerInvitedMember(req.body);
+    const sessionToken = result.token;
 
     const { accessToken, refreshToken, token, ...rest } = result;
 
@@ -63,7 +64,12 @@ const registerInvitedMember = catchAsync(
       statusCode: status.CREATED,
       success: true,
       message: "Member account created successfully",
-      data: result,
+      data: {
+        token: sessionToken,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        user: result.user,
+      },
     });
   },
 );
@@ -167,6 +173,7 @@ const getNewToken = catchAsync(async (req: Request, res: Response) => {
 
 const verifyEmail = catchAsync(async (req: Request, res: Response) => {
   const { email, otp } = req.body;
+  console.log(email,otp);
   await AuthService.verifyEmail(email, otp);
 
   sendResponse(res, {
@@ -184,6 +191,15 @@ const forgetPassword = catchAsync(async (req: Request, res: Response) => {
     statusCode: status.OK,
     success: true,
     message: "Password reset OTP sent to email successfully.",
+  });
+});
+const resendVerificationCode = catchAsync(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  await AuthService.resendVerificationCode(email);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "A new verification code has been sent to your email.",
   });
 });
 
@@ -269,4 +285,5 @@ export const AuthController = {
   googleLogin,
   googleLoginSuccess,
   handleOAuthError,
+  resendVerificationCode,
 };

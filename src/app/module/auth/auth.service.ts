@@ -24,7 +24,6 @@ import { tokenUtils } from "../../utils/token";
 import { jwtUtils } from "../../utils/jwt";
 import type { JwtPayload } from "jsonwebtoken";
 import { PLAN_LIMITS } from "../../config/subscriptionLimits";
-import { date } from "zod";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
@@ -280,6 +279,8 @@ const loginUser = async (payload: ILoginUser) => {
   if (!data.user) {
     throw new AppError(status.UNAUTHORIZED, "Invalid email or password");
   }
+
+
 
   if (data.user.isDeleted) {
     throw new AppError(
@@ -543,6 +544,25 @@ const googleLoginSuccess = async (session: Record<string, any>) => {
   return { accessToken, refreshToken };
 };
 
+const resendVerificationCode = async (email: string) => {
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  if (user.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email is already verified");
+  }
+
+  // Better Auth utility to send a fresh verification email/OTP
+  return await auth.api.sendVerificationEmail({
+    body: { email },
+  });
+};
+
 export const AuthService = {
   registerPublicOwner,
   registerInvitedMember,
@@ -555,4 +575,5 @@ export const AuthService = {
   forgetPassword,
   resetPassword,
   googleLoginSuccess,
+  resendVerificationCode,
 };

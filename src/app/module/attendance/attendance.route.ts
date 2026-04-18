@@ -21,8 +21,14 @@ router.post(
 router.patch(
   "/clock-out/:attendanceId",
   checkAuth(UserRole.OWNER, UserRole.MEMBER),
-  checkProjectRole(),
+  // checkProjectRole(),
   AttendanceController.clockOut,
+);
+
+router.get(
+  "/project/:projectId/my-today",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  AttendanceController.getMyTodayAttendance,
 );
 
 // 🛡️ ONLY Managers can view the complete list of who is on site today
@@ -38,6 +44,12 @@ router.get(
   "/stats/user/:userId",
   checkAuth(UserRole.OWNER, UserRole.MEMBER),
   AttendanceController.getWorkerMonthlyStats,
+);
+
+router.get(
+  "/my-timesheet",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  AttendanceController.getMyTimesheet,
 );
 
 export const AttendanceRoutes = router;

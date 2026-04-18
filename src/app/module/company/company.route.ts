@@ -15,6 +15,12 @@ router.get(
   CompanyController.getAllCompanies,
 );
 
+router.get(
+  "/company-roster",
+  checkAuth(UserRole.SUPER_ADMIN, UserRole.OWNER, UserRole.ADMIN),
+  CompanyController.getCompanyRoster,
+);
+
 // 🛑 2. SUPER_ADMIN ONLY: The Kill Switch (Block/Unblock)
 router.patch(
   "/:id/status",

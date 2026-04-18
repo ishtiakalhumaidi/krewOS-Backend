@@ -17,9 +17,19 @@ router.post(
 
 // 👷 ANY authenticated company member can view the list of projects
 router.get(
-  "/company/:companyId",
+  "/",
   checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
-  ProjectController.getCompanyProjects
+  ProjectController.getCompanyProjects,
 );
-
+// 👷 ANY project member can view the sites they are specifically assigned to
+router.get(
+  "/my-assignments",
+  checkAuth(UserRole.MEMBER, UserRole.ADMIN, UserRole.OWNER),
+  ProjectController.getMyProjects,
+);
+router.get(
+  "/:projectId",
+  checkAuth(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER),
+  ProjectController.getProjectById,
+);
 export const ProjectRoutes = router;

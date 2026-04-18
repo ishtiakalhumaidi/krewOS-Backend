@@ -28,7 +28,10 @@ export const createIncidentSchema = z.object({
 
 // Update Incident Status
 export const updateIncidentStatusSchema = z.object({
-  isResolved: z.boolean(),
+  isResolved: z.union([
+    z.boolean(),
+    z.enum(["true", "false"]).transform((val) => val === "true")
+  ]),
 
   resolutionNotes: z
     .string()

@@ -49,9 +49,24 @@ const resolveIncident = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getMyIncidents = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).user.userId;
+
+  const result = await IncidentService.getMyIncidents(userId, req.query);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Your reported incidents retrieved successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
+
 
 export const IncidentController = {
   createIncident,
   getProjectIncidents,
   resolveIncident,
+  getMyIncidents
 };

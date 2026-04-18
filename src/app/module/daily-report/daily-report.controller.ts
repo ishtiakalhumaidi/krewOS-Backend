@@ -8,6 +8,9 @@ import { DailyReportService } from "./daily-report.service";
 const createReport = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
   payload.submittedBy = (req as any).user.userId;
+  if (req.files && Array.isArray(req.files)) {
+    payload.photoUrls = req.files.map((file: any) => file.path);
+  }
 
   const result = await DailyReportService.createReport(payload);
 

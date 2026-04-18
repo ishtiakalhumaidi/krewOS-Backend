@@ -21,7 +21,9 @@ const clockIn = catchAsync(async (req: Request, res: Response) => {
 const clockOut = catchAsync(async (req: Request, res: Response) => {
   const { attendanceId } = req.params;
   const userId = (req as any).user.userId;
-  const result = await AttendanceService.clockOut(attendanceId as string, userId);
+  const role = (req as any).user.role; 
+
+  const result = await AttendanceService.clockOut(attendanceId as string, userId, role);
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -31,6 +33,19 @@ const clockOut = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyTodayAttendance = catchAsync(async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const userId = (req as any).user.userId;
+
+  const result = await AttendanceService.getMyTodayAttendance(projectId as string, userId);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Today's status retrieved",
+    data: result, 
+  });
+});
 const getProjectAttendanceToday = catchAsync(
   async (req: Request, res: Response) => {
     const { projectId } = req.params;
@@ -69,10 +84,25 @@ const getWorkerMonthlyStats = catchAsync(
     });
   },
 );
+const getMyTimesheet = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).user.userId; // Securely extract the logged-in user
+  const year = parseInt(req.query.year as string) || new Date().getFullYear();
+  const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
 
+  const result = await AttendanceService.getWorkerMonthlyStats(userId, year, month);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Personal timesheet retrieved successfully",
+    data: result,
+  });
+});
 export const AttendanceController = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
   getWorkerMonthlyStats,
+  getMyTodayAttendance,
+  getMyTimesheet,
 };

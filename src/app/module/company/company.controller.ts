@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
@@ -24,6 +25,18 @@ const getCompanyById = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
+const getCompanyRoster = catchAsync(async (req: Request, res: Response) => {
+  const companyId = (req as any).user.companyId;
+  const result = await CompanyService.getCompanyRoster(companyId as string);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Company roster retrieved",
+    data: result,
+  });
+});
+
 
 const updateCompany = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
@@ -59,4 +72,5 @@ export const CompanyController = {
   getCompanyById,
   updateCompany,
   changeStatus,
+  getCompanyRoster,
 };

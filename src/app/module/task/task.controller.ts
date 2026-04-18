@@ -28,7 +28,7 @@ const getProjectTasks = catchAsync(async (req: Request, res: Response) => {
     statusCode: status.OK,
     success: true,
     message: "Tasks retrieved successfully",
-    meta: result.meta, // Add pagination metadata
+    meta: result.meta, 
     data: result.data,
   });
 });
@@ -46,8 +46,35 @@ const updateTask = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const deleteTask = catchAsync(async (req: Request, res: Response) => {
+  const { taskId } = req.params;
+  const result = await TaskService.deleteTask(taskId as string);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Task deleted successfully",
+    data: result,
+  });
+});
+
+const getMyTasks = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req as any).user.userId; 
+  
+  const result = await TaskService.getMyTasks(userId as string, req.query);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Your tasks retrieved successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
 export const TaskController = {
   createTask,
   getProjectTasks,
+  getMyTasks,
   updateTask,
+  deleteTask, 
 };

@@ -2,6 +2,7 @@ import status from "http-status";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { IClockIn } from "./attendance.interface";
+import { ProjectRole, UserRole } from "../../../generated/prisma/enums";
 
 const clockIn = async (payload: IClockIn) => {
   // 1. Verify they are actually assigned to this project
@@ -56,7 +57,7 @@ const clockIn = async (payload: IClockIn) => {
   return result;
 };
 
-const clockOut = async (attendanceId: string, userId: string) => {
+const clockOut = async (attendanceId: string, requesterId: string, requesterRole: string) => {
   const existingRecord = await prisma.attendance.findUnique({
     where: { id: attendanceId },
   });
@@ -65,23 +66,31 @@ const clockOut = async (attendanceId: string, userId: string) => {
     throw new AppError(status.NOT_FOUND, "Attendance record not found");
   }
 
-  if (existingRecord.userId !== userId) {
-    throw new AppError(
-      status.FORBIDDEN,
-      "You can only clock out your own attendance record",
-    );
+  // 🛡️ OVERRIDE LOGIC: If the user is not clocking themselves out
+  if (existingRecord.userId !== requesterId) {
+    // If they aren't a Global Admin/Owner...
+    if (requesterRole !== UserRole.OWNER && requesterRole !== UserRole.ADMIN && requesterRole !== UserRole.SUPER_ADMIN) {
+      // ...Check if they are a Site Manager or Project Manager on this specific site
+      const isManager = await prisma.projectMember.findUnique({
+        where: { projectId_userId: { projectId: existingRecord.projectId, userId: requesterId } }
+      });
+
+      if (!isManager || (isManager.role !== ProjectRole.PROJECT_MANAGER && isManager.role !== ProjectRole.SITE_MANAGER)) {
+        throw new AppError(
+          status.FORBIDDEN,
+          "You do not have permission to clock out this worker"
+        );
+      }
+    }
   }
+
   if (existingRecord.clockOut) {
     throw new AppError(status.CONFLICT, "Worker has already clocked out today");
   }
 
   const clockOutTime = new Date();
-
-  const diffInMilliseconds =
-    clockOutTime.getTime() - existingRecord.clockIn.getTime();
-  const hoursWorked = Number(
-    (diffInMilliseconds / (1000 * 60 * 60)).toFixed(2),
-  );
+  const diffInMilliseconds = clockOutTime.getTime() - existingRecord.clockIn.getTime();
+  const hoursWorked = Number((diffInMilliseconds / (1000 * 60 * 60)).toFixed(2));
 
   const result = await prisma.attendance.update({
     where: { id: attendanceId },
@@ -93,7 +102,18 @@ const clockOut = async (attendanceId: string, userId: string) => {
 
   return result;
 };
+const getMyTodayAttendance = async (projectId: string, userId: string) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
+  return await prisma.attendance.findFirst({
+    where: {
+      projectId: projectId,
+      userId: userId,
+      clockIn: { gte: today },
+    },
+  });
+};
 const getProjectAttendanceToday = async (projectId: string) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -123,20 +143,22 @@ const getWorkerMonthlyStats = async (
   const stats = await prisma.attendance.aggregate({
     where: {
       userId: userId,
-      clockIn: {
-        gte: startDate,
-        lt: endDate,
-      },
-      hoursWorked: {
-        not: null,
-      },
+      clockIn: { gte: startDate, lt: endDate },
+      hoursWorked: { not: null },
     },
-    _sum: {
-      hoursWorked: true,
+    _sum: { hoursWorked: true },
+    _count: { id: true },
+  });
+
+  const logs = await prisma.attendance.findMany({
+    where: {
+      userId: userId,
+      clockIn: { gte: startDate, lt: endDate },
     },
-    _count: {
-      id: true,
+    include: {
+      project: { select: { name: true, location: true } }
     },
+    orderBy: { clockIn: "desc" }
   });
 
   return {
@@ -144,6 +166,7 @@ const getWorkerMonthlyStats = async (
     month,
     totalHoursWorked: stats._sum.hoursWorked || 0,
     totalShiftsCompleted: stats._count.id,
+    logs, // 👉 Return the logs to the frontend!
   };
 };
 
@@ -153,4 +176,5 @@ export const AttendanceService = {
   clockOut,
   getProjectAttendanceToday,
   getWorkerMonthlyStats,
+  getMyTodayAttendance
 };

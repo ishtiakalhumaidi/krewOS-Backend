@@ -5,6 +5,7 @@ import type {
   ICreateIncident,
   IUpdateIncidentStatus,
 } from "./incident.interface";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
 const createIncident = async (payload: ICreateIncident) => {
   // Ensure the user is actually part of the project
@@ -68,8 +69,30 @@ const resolveIncident = async (
   return result;
 };
 
+const getMyIncidents = async (userId: string, query: Record<string, unknown>) => {
+  const incidentQuery = new QueryBuilder(
+    prisma.incident, 
+    query, 
+    {
+      searchableFields: ['title', 'description'],
+      filterableFields: ['status', 'severity', 'projectId'],
+    }
+  )
+    .search()
+    .filter()
+    .where({ reportedBy: userId })
+    .paginate()
+    .sort()
+    .include({
+      project: { select: { id: true, name: true, location: true } }
+    });
+
+  return await incidentQuery.execute();
+};
+
 export const IncidentService = {
   createIncident,
   getProjectIncidents,
   resolveIncident,
+  getMyIncidents
 };

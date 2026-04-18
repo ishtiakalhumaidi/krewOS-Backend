@@ -31,14 +31,15 @@ const createReport = async (payload: ICreateDailyReport) => {
   const totalWorkers = await prisma.projectMember.count({
     where: {
       projectId: payload.projectId,
-      role: ProjectRole.WORKER,
+      role: ProjectRole.WORKER ,
     },
   });
+  console.log("Total workers on site:", totalWorkers);
 
   if (payload.workersPresent > totalWorkers) {
     throw new AppError(
       status.BAD_REQUEST,
-      "Present workers cannot be greater than total workers",
+      `Present workers cannot be greater than total workers (${totalWorkers}).`,
     );
   }
 

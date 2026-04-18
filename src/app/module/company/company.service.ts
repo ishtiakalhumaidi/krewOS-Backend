@@ -30,7 +30,22 @@ const getCompanyById = async (companyId: string) => {
   if (!result) throw new AppError(status.NOT_FOUND, "Company not found");
   return result;
 };
-
+// Add this to a user.service.ts or similar
+const getCompanyRoster = async (companyId: string) => {
+  return await prisma.user.findMany({
+    where: { 
+      companyId: companyId,
+      isDeleted: false 
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      isActive: true,
+    }
+  });
+};
 const updateCompany = async (companyId: string, payload: IUpdateCompany) => {
   const result = await prisma.company.update({
     where: { id: companyId },
@@ -55,4 +70,5 @@ export const CompanyService = {
   getCompanyById,
   updateCompany,
   changeCompanyStatus,
+  getCompanyRoster, 
 };

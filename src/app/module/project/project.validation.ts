@@ -2,7 +2,6 @@ import { z } from "zod";
 
 export const createProjectSchema = z
   .object({
-    companyId: z.uuid("Invalid company ID format"),
 
    
     name: z

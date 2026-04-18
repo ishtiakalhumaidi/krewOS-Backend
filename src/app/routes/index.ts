@@ -11,6 +11,7 @@ import { SafetyChecklistRoutes } from "../module/safety-checklist/safety-checkli
 import { CompanyRoutes } from "../module/company/company.route";
 import { AdminRoutes } from "../module/admin/admin.route";
 import { BillingRoutes } from "../module/billing/billing.route";
+import { DashboardRoutes } from "../module/dashboard/dashboard.route";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use("/incidents", IncidentRoutes);
 router.use("/safety-checklists", SafetyChecklistRoutes);
 router.use("/admin", AdminRoutes);
 router.use("/billing", BillingRoutes);
+router.use("/dashboard", DashboardRoutes);
 
 export const IndexRouter = router;

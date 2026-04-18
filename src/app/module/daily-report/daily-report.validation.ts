@@ -13,11 +13,11 @@ export const createDailyReportSchema = z.object({
     .min(5, "Summary must be at least 5 characters")
     .max(1000, "Summary must be at most 1000 characters"),
 
-  workersPresent: z.number().min(0, "Workers present cannot be negative"),
+  workersPresent: z.coerce.number().min(0, "Workers present cannot be negative"),
 
   weatherCondition: z.nativeEnum(WeatherCondition),
 
-  photoUrls: z.url("Invalid photo URL").optional(),
+  photoUrls: z.array(z.string().url("Invalid photo URL")).optional(),
 
   pdfUrl: z.url("Invalid PDF URL").optional(),
 });

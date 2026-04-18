@@ -1,40 +1,45 @@
 import { Router } from "express";
-import { MaterialRequestController } from "./material-request.controller";
 import { validateRequest } from "../../middleware/validateRequest";
 import { checkAuth } from "../../middleware/checkAuth";
 import { checkProjectRole } from "../../middleware/checkProjectRole";
-import { ProjectRole, UserRole } from "../../../generated/prisma/enums";
-import {
-  createMaterialRequestSchema,
-  updateMaterialRequestStatusSchema,
-} from "./material-request.validation";
+import {  UserRole } from "../../../generated/prisma/enums";
+
+import { multerUpload } from "../../config/multer.config";
+import { createMaterialSchema, updateMaterialStatusSchema } from "./material-request.validation";
+import { MaterialController } from "./material-request.controller";
 
 const router = Router();
 
-// 👷 ANY project member can request materials
 router.post(
   "/",
-  checkAuth(UserRole.OWNER, UserRole.MEMBER),
-  checkProjectRole(),
-  validateRequest(createMaterialRequestSchema),
-  MaterialRequestController.createRequest,
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  validateRequest(createMaterialSchema),
+  MaterialController.createRequest,
 );
 
-// 👀 ANY project member can view the material requests
+// 👷 Worker views their own requests
 router.get(
-  "/project/:projectId", 
-  checkAuth(UserRole.OWNER, UserRole.MEMBER),
-  checkProjectRole(),
-  MaterialRequestController.getProjectRequests
+  "/my-requests",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  MaterialController.getMyRequests,
 );
 
-// 🛡️ ONLY Managers can approve, reject, or mark materials as delivered
+// 👀 Admin/Manager views all requests for a project
+router.get(
+  "/project/:projectId",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  checkProjectRole(),
+  MaterialController.getProjectRequests,
+);
+
+// 🔄 Update Status (Approve/Reject/Deliver) - Accepts Single Photo upload!
 router.patch(
   "/:requestId/status",
-  checkAuth(UserRole.OWNER, UserRole.MEMBER),
-  checkProjectRole(ProjectRole.PROJECT_MANAGER, ProjectRole.SITE_MANAGER),
-  validateRequest(updateMaterialRequestStatusSchema),
-  MaterialRequestController.updateStatus,
+  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.MEMBER),
+  multerUpload.single("deliveryPhoto"), // 👉 Expects a single file named "deliveryPhoto"
+  // Note: We skip checkProjectRole here so both Admins (Approve) and Workers (Mark Delivered) can use it
+  validateRequest(updateMaterialStatusSchema),
+  MaterialController.updateStatus,
 );
 
 export const MaterialRequestRoutes = router;
