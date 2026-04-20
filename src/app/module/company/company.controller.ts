@@ -15,13 +15,13 @@ const getAllCompanies = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getCompanyById = catchAsync(async (req: Request, res: Response) => {
+const toggleCompanyStatus = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await CompanyService.getCompanyById(id as string);
+  const result = await CompanyService.toggleCompanyStatus(id as string);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "Company details retrieved",
+    message: `Company is now ${result.isActive ? 'Active' : 'Suspended'}`,
     data: result,
   });
 });
@@ -36,17 +36,31 @@ const getCompanyRoster = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getCompanyById = catchAsync(async (req: Request, res: Response) => {
+  const id = req.params.id || (req as any).user.companyId;
 
+  const result = await CompanyService.getCompanyById(id as string);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Company details retrieved",
+    data: result,
+  });
+});
 
 const updateCompany = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  req.body.logoUrl = req.file?.path;
+  const id = req.params.id || (req as any).user.companyId;
+
+  // 👉 Map the Multer file to logoUrl
+  if (req.file) {
+    req.body.logoUrl = req.file.path;
+  }
 
   const result = await CompanyService.updateCompany(id as string, req.body);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "Company updated",
+    message: "Company profile updated successfully",
     data: result,
   });
 });
@@ -73,4 +87,5 @@ export const CompanyController = {
   updateCompany,
   changeStatus,
   getCompanyRoster,
+  toggleCompanyStatus,
 };

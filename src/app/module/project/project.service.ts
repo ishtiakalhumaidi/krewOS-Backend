@@ -3,7 +3,6 @@ import { ProjectRole, SubscriptionPlan } from "../../../generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { ICreateProject } from "./project.interface";
-import { PLAN_LIMITS } from "../../config/subscriptionLimits";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 
 const createProject = async (payload: ICreateProject) => {
@@ -22,7 +21,26 @@ const createProject = async (payload: ICreateProject) => {
 
   // 2. Determine their limits
   const currentPlan = company.subscription?.plan || SubscriptionPlan.FREE;
-  const limit = PLAN_LIMITS[currentPlan].maxProjects;
+  const planConfig = await prisma.planConfig.findUnique({
+    where: { tier: currentPlan },
+  });
+
+  if (!planConfig) {
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      "Pricing configuration error. Contact support.",
+    );
+  }
+
+  const limit = planConfig.maxProjects;
+
+  // The Gatekeeper Check
+  if (company._count.projects >= limit) {
+    throw new AppError(
+      status.FORBIDDEN,
+      `Upgrade Required: Your ${currentPlan} plan is limited to ${limit} project(s).`,
+    );
+  }
 
   // 3. The Gatekeeper Check
   if (company._count.projects >= limit) {
@@ -53,18 +71,17 @@ const createProject = async (payload: ICreateProject) => {
   });
 };
 
-const getCompanyProjects = async (companyId: string, query: Record<string, unknown>) => {
-  const projectQuery = new QueryBuilder(
-    prisma.project, 
-    query, 
-    {
-      searchableFields: ['name', 'description'],
-      filterableFields: ['status'],
-    }
-  )
+const getCompanyProjects = async (
+  companyId: string,
+  query: Record<string, unknown>,
+) => {
+  const projectQuery = new QueryBuilder(prisma.project, query, {
+    searchableFields: ["name", "description"],
+    filterableFields: ["status"],
+  })
     .search()
     .filter()
-    .where({ companyId }) 
+    .where({ companyId })
     .paginate()
     .sort()
     .include({
@@ -77,26 +94,25 @@ const getCompanyProjects = async (companyId: string, query: Record<string, unkno
 
   // execute() returns { data, meta }
   const result = await projectQuery.execute();
-  return result; 
+  return result;
 };
 
-const getMyProjects = async (userId: string, query: Record<string, unknown>) => {
-  const projectQuery = new QueryBuilder(
-    prisma.project, 
-    query, 
-    {
-      searchableFields: ['name', 'location', 'description'],
-      filterableFields: ['status'],
-    }
-  )
+const getMyProjects = async (
+  userId: string,
+  query: Record<string, unknown>,
+) => {
+  const projectQuery = new QueryBuilder(prisma.project, query, {
+    searchableFields: ["name", "location", "description"],
+    filterableFields: ["status"],
+  })
     .search()
     .filter()
     .where({
       // 👉 The Magic Filter: Only return projects where this user is a member!
       members: {
-        some: { userId }
-      }
-    }) 
+        some: { userId },
+      },
+    })
     .paginate()
     .sort()
     .include({
@@ -106,7 +122,7 @@ const getMyProjects = async (userId: string, query: Record<string, unknown>) => 
       },
     });
 
-  return await projectQuery.execute(); 
+  return await projectQuery.execute();
 };
 const getProjectById = async (projectId: string, companyId: string) => {
   const project = await prisma.project.findFirst({
@@ -115,25 +131,27 @@ const getProjectById = async (projectId: string, companyId: string) => {
       companyId: companyId,
     },
     include: {
-  
       owner: {
         select: {
           name: true,
           email: true,
         },
       },
-      
     },
   });
 
   if (!project) {
-    throw new AppError(status.NOT_FOUND, "Project not found or you do not have permission to view it.");
+    throw new AppError(
+      status.NOT_FOUND,
+      "Project not found or you do not have permission to view it.",
+    );
   }
 
   return project;
 };
 export const ProjectService = {
   createProject,
-  getCompanyProjects,getProjectById,
+  getCompanyProjects,
+  getProjectById,
   getMyProjects,
 };

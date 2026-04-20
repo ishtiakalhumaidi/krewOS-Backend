@@ -97,7 +97,7 @@ const loadEnv = (): EnvConfig => {
     SMTP_USER: process.env.SMTP_USER as string,
     SMTP_PASS: process.env.SMTP_PASS as string,
 
-    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_PUBLISHABLE_KEY as string,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET as string,
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY as string,
 
     ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET as string,

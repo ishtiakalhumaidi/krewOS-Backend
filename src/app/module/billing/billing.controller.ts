@@ -1,4 +1,4 @@
-// src/app/module/billing/billing.controller.ts
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import status from "http-status";
@@ -9,10 +9,11 @@ import { stripe } from "../../config/stripe.config";
 import { envVars } from "../../config/env";
 
 const createCheckout = catchAsync(async (req: Request, res: Response) => {
-  const { priceId } = req.body; 
+  const { plan } = req.body; 
   const companyId = (req as any).user.companyId;
+  const userEmail = (req as any).user.email;
 
-  const result = await BillingService.createCheckoutSession(companyId, priceId);
+  const result = await BillingService.createCheckoutSession(companyId, plan, userEmail);
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -22,29 +23,35 @@ const createCheckout = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getPlans = catchAsync(async (req: Request, res: Response) => {
+  const result = await BillingService.getAvailablePlans();
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Subscription plans retrieved successfully",
+    data: result,
+  });
+});
+
 const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
+
   const signature = req.headers["stripe-signature"] as string;
   const webhookSecret = envVars.STRIPE_WEBHOOK_SECRET;
 
   if (!signature || !webhookSecret) {
-    console.error("Missing Stripe signature or webhook secret");
-    return res.status(status.BAD_REQUEST).json({ message: "Missing Stripe signature or webhook secret" });
+    return res.status(status.BAD_REQUEST).json({ message: "Missing credentials" });
   }
 
   let event;
 
   try {
-    // req.body MUST be a raw Buffer! Make sure `express.raw({type: 'application/json'})` is used in app.ts for this route
     event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
   } catch (err: any) {
-    console.error(`Webhook signature verification failed: ${err.message}`);
     return res.status(status.BAD_REQUEST).json({ message: `Webhook Error: ${err.message}` });
   }
 
   try {
-    // Pass the verified event to the Business Logic Service
     const result = await BillingService.handleStripeWebhookEvent(event);
-
     sendResponse(res, {
       statusCode: status.OK,
       success: true,
@@ -52,7 +59,6 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
-    console.error("Error processing Stripe webhook event:", error);
     sendResponse(res, {
       statusCode: status.INTERNAL_SERVER_ERROR,
       success: false,
@@ -61,7 +67,32 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
   }
 });
 
+const updatePlan = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params; 
+  const result = await BillingService.updatePlanConfig(id as string, req.body);
+  
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Pricing plan updated successfully",
+    data: result,
+  });
+});
+
+const seedPlans = catchAsync(async (req: Request, res: Response) => {
+  const result = await BillingService.seedPlanConfigs();
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Plans seeded successfully",
+    data: result,
+  });
+});
+
 export const BillingController = {
   createCheckout,
+  getPlans,
   handleStripeWebhook,
+  updatePlan,
+  seedPlans,
 };

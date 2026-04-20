@@ -1,34 +1,48 @@
-import { prisma } from "../../lib/prisma";
+
 import status from "http-status";
-import type { IUpdateCompany, IChangeCompanyStatus } from "./company.interface";
 import AppError from "../../errorHelpers/AppError";
+import { prisma } from "../../lib/prisma";
+import type { IUpdateCompany, IChangeCompanyStatus } from "./company.interface";
 
 const getAllCompanies = async () => {
   const result = await prisma.company.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       _count: {
-        select: { users: true, projects: true }, // Tells you how big the client is!
+        select: { users: true, projects: true }, 
       },
       subscription: {
-        select: { plan: true, status: true }, // Tells you if they are paying!
+        select: { plan: true, status: true }, 
       },
     },
   });
   return result;
 };
 
-const getCompanyById = async (companyId: string) => {
-  const result = await prisma.company.findUnique({
-    where: { id: companyId },
-    include: {
-      subscription: true,
-      _count: { select: { users: true, projects: true } },
-    },
+
+// 👑 SUPER ADMIN: The "Kill Switch"
+const toggleCompanyStatus = async (companyId: string) => {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId }
   });
 
-  if (!result) throw new AppError(status.NOT_FOUND, "Company not found");
-  return result;
+  if (!company) {
+    throw new AppError(status.NOT_FOUND, "Company not found");
+  }
+
+  return await prisma.company.update({
+    where: { id: companyId },
+    data: { isActive: !company.isActive }
+  });
+};
+
+const getCompanyById = async (id: string) => {
+  return await prisma.company.findUnique({
+    where: { id },
+    include: {
+      subscription: true, // So the Owner can see their plan
+    }
+  });
 };
 // Add this to a user.service.ts or similar
 const getCompanyRoster = async (companyId: string) => {
@@ -46,12 +60,11 @@ const getCompanyRoster = async (companyId: string) => {
     }
   });
 };
-const updateCompany = async (companyId: string, payload: IUpdateCompany) => {
-  const result = await prisma.company.update({
-    where: { id: companyId },
+const updateCompany = async (id: string, payload: IUpdateCompany) => {
+  return await prisma.company.update({
+    where: { id },
     data: payload,
   });
-  return result;
 };
 
 const changeCompanyStatus = async (
@@ -71,4 +84,5 @@ export const CompanyService = {
   updateCompany,
   changeCompanyStatus,
   getCompanyRoster, 
+  toggleCompanyStatus,
 };

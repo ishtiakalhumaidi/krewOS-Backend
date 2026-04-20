@@ -1,15 +1,49 @@
+// 🌟 ADD THIS NEW MODEL
+model PlanConfig {
+  id          String           @id @default(uuid())
+  tier        SubscriptionPlan @unique // Links to FREE, PRO, ENTERPRISE
+  name        String           // e.g., "PRO TIER"
+  price       Float            // e.g., 49.00
+  interval    String           // e.g., "per month"
+  description String
+  features    String[]         // Postgres array (use Json if using MySQL)
+
+  // System Limits
+  maxProjects Int              // Use 999999 for "Unlimited"
+  maxMembers  Int
+  maxStorage  Int              // e.g., in MB
+
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relation: A PlanConfig can have many Subscriptions
+  subscriptions Subscription[]
+
+  @@map("plan_config")
+}
+
+// 🌟 UPDATE YOUR EXISTING SUBSCRIPTION MODEL
 model Subscription {
-  id               String             @id @default(uuid())
-  companyId        String             @unique
-  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  stripeCustomerId String?            @unique
-  stripeSubId      String?            @unique
-  plan             SubscriptionPlan   @default(FREE)
-  status           SubscriptionStatus @default(TRIALING)
-  currentPeriodEnd DateTime?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  id                   String             @id @default(uuid())
+  companyId            String             @unique
+  company              Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
+  plan                 SubscriptionPlan   @default(FREE)
+  
+  planConfigId         String?
+  planConfig           PlanConfig?        @relation(fields: [planConfigId], references: [id])
+  
+  status               SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
   @@map("subscription")
 }
 

@@ -95,7 +95,15 @@ const sendInvite = async (payload: IInviteWorker) => {
 
   const totalSeatsUsed = activeUsers + pendingInvites;
   const currentPlan = company.subscription?.plan || SubscriptionPlan.FREE;
-  const limit = PLAN_LIMITS[currentPlan].maxMembers;
+  const planConfig = await prisma.planConfig.findUnique({
+    where: { tier: currentPlan },
+  });
+
+  if (!planConfig) {
+    throw new AppError(status.INTERNAL_SERVER_ERROR, "Pricing configuration error.");
+  }
+
+  const limit = planConfig.maxMembers;
 
   if (totalSeatsUsed >= limit) {
     throw new AppError(

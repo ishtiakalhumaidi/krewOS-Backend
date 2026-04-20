@@ -12,10 +12,12 @@ import { CompanyRoutes } from "../module/company/company.route";
 import { AdminRoutes } from "../module/admin/admin.route";
 import { BillingRoutes } from "../module/billing/billing.route";
 import { DashboardRoutes } from "../module/dashboard/dashboard.route";
+import { UserRoutes } from "../module/user/user.route";
 
 const router = Router();
 
 router.use("/auth", AuthRoutes);
+router.use("/users", UserRoutes);
 router.use("/companies", CompanyRoutes);
 router.use("/projects", ProjectRoutes);
 router.use("/tasks", TaskRoutes);
