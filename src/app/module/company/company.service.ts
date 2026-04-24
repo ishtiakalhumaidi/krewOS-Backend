@@ -1,29 +1,32 @@
-
 import status from "http-status";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { IUpdateCompany, IChangeCompanyStatus } from "./company.interface";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
-const getAllCompanies = async () => {
-  const result = await prisma.company.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      _count: {
-        select: { users: true, projects: true }, 
-      },
+const getAllCompanies = async (query: Record<string, unknown>) => {
+  const companyQuery = new QueryBuilder(prisma.company, query, {
+    searchableFields: ["name", "slug"],
+    filterableFields: ["plan", "isActive", "status"], 
+  })
+    .search()
+    .filter()
+    .paginate()
+    .sort()
+    .include({
       subscription: {
-        select: { plan: true, status: true }, 
+        select: { plan: true, status: true, currentPeriodEnd: true },
       },
-    },
-  });
-  return result;
-};
+      _count: { select: { users: true, projects: true } },
+    });
 
+  return await companyQuery.execute();
+};
 
 // 👑 SUPER ADMIN: The "Kill Switch"
 const toggleCompanyStatus = async (companyId: string) => {
   const company = await prisma.company.findUnique({
-    where: { id: companyId }
+    where: { id: companyId },
   });
 
   if (!company) {
@@ -32,7 +35,7 @@ const toggleCompanyStatus = async (companyId: string) => {
 
   return await prisma.company.update({
     where: { id: companyId },
-    data: { isActive: !company.isActive }
+    data: { isActive: !company.isActive },
   });
 };
 
@@ -41,15 +44,15 @@ const getCompanyById = async (id: string) => {
     where: { id },
     include: {
       subscription: true, // So the Owner can see their plan
-    }
+    },
   });
 };
 // Add this to a user.service.ts or similar
 const getCompanyRoster = async (companyId: string) => {
   return await prisma.user.findMany({
-    where: { 
+    where: {
       companyId: companyId,
-      isDeleted: false 
+      isDeleted: false,
     },
     select: {
       id: true,
@@ -57,7 +60,7 @@ const getCompanyRoster = async (companyId: string) => {
       email: true,
       role: true,
       isActive: true,
-    }
+    },
   });
 };
 const updateCompany = async (id: string, payload: IUpdateCompany) => {
@@ -83,6 +86,6 @@ export const CompanyService = {
   getCompanyById,
   updateCompany,
   changeCompanyStatus,
-  getCompanyRoster, 
+  getCompanyRoster,
   toggleCompanyStatus,
 };

@@ -6,11 +6,12 @@ import { sendResponse } from "../../shared/sendResponse";
 import { CompanyService } from "./company.service";
 
 const getAllCompanies = catchAsync(async (req: Request, res: Response) => {
-  const result = await CompanyService.getAllCompanies();
+  const result = await CompanyService.getAllCompanies(req.query);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "All companies retrieved",
+    message: "All companies retrieved successfully",
+    meta: result.meta,
     data: result,
   });
 });

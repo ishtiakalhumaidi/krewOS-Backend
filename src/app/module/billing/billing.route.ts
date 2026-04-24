@@ -7,28 +7,46 @@ const router = Router();
 router.get(
   "/plans",
   checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
-  BillingController.getPlans
+  BillingController.getPlans,
 );
 router.post(
   "/webhook",
   express.raw({ type: "application/json" }),
-  BillingController.handleStripeWebhook
+  BillingController.handleStripeWebhook,
 );
+
+router.get(
+  "/history",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN),
+  BillingController.getMyPayments,
+);
+router.get(
+  "/platform-history",
+  checkAuth(UserRole.SUPER_ADMIN),
+  BillingController.getAllPlatformPayments,
+);
+
 router.post(
   "/seed",
   checkAuth(UserRole.SUPER_ADMIN),
-  BillingController.seedPlans
+  BillingController.seedPlans,
 );
 // Route to create a checkout session (Standard JSON route)
 router.post(
   "/create-checkout-session",
   checkAuth(UserRole.OWNER, UserRole.ADMIN),
-  BillingController.createCheckout
+  BillingController.createCheckout,
+);
+
+router.post(
+  "/cancel",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN),
+  BillingController.cancelSubscription,
 );
 // 👑 SUPER ADMIN ONLY: Update plan prices and limits
 router.patch(
   "/plans/:id",
   checkAuth(UserRole.SUPER_ADMIN),
-  BillingController.updatePlan
+  BillingController.updatePlan,
 );
 export const BillingRoutes = router;

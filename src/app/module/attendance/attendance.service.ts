@@ -170,11 +170,61 @@ const getWorkerMonthlyStats = async (
   };
 };
 
+const getCompanyTimesheets = async (companyId: string, startDate: string, endDate: string) => {
+  
+  const attendances = await prisma.attendance.findMany({
+    where: {
+      project: { companyId: companyId },
+      clockIn: {
+        gte: new Date(startDate), // Greater than or equal to start date
+        lte: new Date(endDate),   // Less than or equal to end date
+      },
+      clockOut: { not: null }     // Only calculate finished shifts!
+    },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      project: { select: { name: true } }
+    }
+  });
+
+  // 2. Aggregate the hours per User
+  const timesheetMap = new Map();
+
+  attendances.forEach((record) => {
+    if (!timesheetMap.has(record.userId)) {
+      timesheetMap.set(record.userId, {
+        userId: record.user.id,
+        name: record.user.name,
+        email: record.user.email,
+        totalHours: 0,
+        shifts: 0,
+        projects: new Set()
+      });
+    }
+
+    const userStat = timesheetMap.get(record.userId);
+    userStat.totalHours += (record.hoursWorked || 0);
+    userStat.shifts += 1;
+    userStat.projects.add(record.project.name);
+  });
+
+  // 3. Format the final array for the frontend
+  const timesheets = Array.from(timesheetMap.values()).map(stat => ({
+    ...stat,
+    totalHours: Number(stat.totalHours.toFixed(2)),
+    projects: Array.from(stat.projects)
+  }));
+
+  return timesheets;
+};
+
 // Don't forget to export it!
 export const AttendanceService = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
   getWorkerMonthlyStats,
-  getMyTodayAttendance
+  getMyTodayAttendance,
+  getCompanyTimesheets
+
 };

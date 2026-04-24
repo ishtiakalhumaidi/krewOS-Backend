@@ -42,7 +42,28 @@ const createIncident = async (payload: ICreateIncident) => {
 
   return result;
 };
+const getCompanyIncidents = async (companyId: string, query: Record<string, unknown>) => {
+  const incidentQuery = new QueryBuilder(
+    prisma.incident, 
+    query, 
+    {
+      searchableFields: ['title', 'description'],
+      filterableFields: ['status', 'severity', 'projectId'],
+    }
+  )
+    .search()
+    .filter()
+  
+    .where({ project: { companyId: companyId } }) 
+    .paginate()
+    .sort()
+    .include({
+      project: { select: { id: true, name: true } },
+      reporter: { select: { id: true, name: true, email: true } }
+    });
 
+  return await incidentQuery.execute();
+};
 const getProjectIncidents = async (projectId: string) => {
   const result = await prisma.incident.findMany({
     where: { projectId },
@@ -94,5 +115,6 @@ export const IncidentService = {
   createIncident,
   getProjectIncidents,
   resolveIncident,
-  getMyIncidents
+  getMyIncidents,
+  getCompanyIncidents
 };

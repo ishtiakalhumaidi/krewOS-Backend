@@ -33,7 +33,22 @@ const getProjectIncidents = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getCompanyIncidents = catchAsync(async (req: Request, res: Response) => {
+  const companyId = (req as any).user.companyId; // Grab from token!
 
+  const result = await IncidentService.getCompanyIncidents(
+    companyId,
+    req.query,
+  );
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Company incidents retrieved successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
 const resolveIncident = catchAsync(async (req: Request, res: Response) => {
   const { incidentId } = req.params;
   const payload = req.body;
@@ -63,10 +78,10 @@ const getMyIncidents = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-
 export const IncidentController = {
   createIncident,
   getProjectIncidents,
   resolveIncident,
-  getMyIncidents
+  getMyIncidents,
+  getCompanyIncidents,
 };

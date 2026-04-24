@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Stripe from "stripe";
 import { stripe } from "../../config/stripe.config";
@@ -10,6 +11,7 @@ import {
   PaymentStatus,
   SubscriptionPlan,
 } from "../../../generated/prisma/enums";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
 // ---------------------------------------------------------------------------
 // 1. CREATE CHECKOUT SESSION
@@ -47,7 +49,6 @@ const createCheckoutSession = async (
       create: { companyId, stripeCustomerId: customerId },
     });
   } else {
-    // Force update the existing customer's email in Stripe for reliable pre-filling
     await stripe.customers.update(customerId, { email: userEmail });
   }
 
@@ -71,6 +72,7 @@ const createCheckoutSession = async (
     ],
     success_url: `${envVars.FRONTEND_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${envVars.FRONTEND_URL}/admin/settings/billing?canceled=true`,
+    client_reference_id: companyId,
     metadata: {
       companyId: companyId,
       planTier: planConfig.tier,
@@ -89,69 +91,100 @@ const handleStripeWebhookEvent = async (event: Stripe.Event) => {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      const companyId = session.metadata?.companyId;
+      const companyId =
+        session.metadata?.companyId || session.client_reference_id;
       const planTier = session.metadata?.planTier as SubscriptionPlan;
       const planConfigId = session.metadata?.planConfigId;
 
-      if (!companyId || !planTier) {
-        console.error("Missing companyId or planTier in session metadata");
-        return { message: "Missing metadata" };
-      }
+      if (!companyId || !planTier) return { message: "Missing metadata" };
 
       const company = await prisma.company.findUnique({
         where: { id: companyId },
         include: { subscription: true },
       });
 
-      if (!company || !company.subscription) {
-        console.error(`Company or Subscription not found for ID: ${companyId}`);
+      if (!company || !company.subscription)
         return { message: "Company/Subscription not found" };
+
+      const newSubscriptionId = session.subscription as string;
+      const oldSubscriptionId = company.subscription.stripeSubscriptionId;
+      let startDate = new Date();
+      let endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+      if (newSubscriptionId) {
+        try {
+          const stripeSub = (await stripe.subscriptions.retrieve(
+            newSubscriptionId,
+          )) as any;
+          if (stripeSub && stripeSub.current_period_start) {
+            startDate = new Date(stripeSub.current_period_start * 1000);
+            endDate = new Date(stripeSub.current_period_end * 1000);
+          }
+        } catch (err) {
+          console.log(
+            "⚠️ Could not fetch Stripe dates, using standard 30-day fallback.",
+          );
+        }
       }
 
-      await prisma.$transaction(async (tx) => {
-        // 1. Update Subscription
-        await tx.subscription.update({
-          where: { companyId: companyId },
-          data: {
-            stripeSubscriptionId: session.subscription as string,
-            status: SubscriptionStatus.ACTIVE,
-            plan: planTier,
-            planConfigId: planConfigId,
-          },
-        });
-
-        // 2. Update Company
-        await tx.company.update({
-          where: { id: companyId },
-          data: { plan: planTier },
-        });
-
-        // 🌟 3. INSTANTLY SAVE THE FIRST PAYMENT HERE!
-        if (session.payment_status === "paid") {
-          // Stripe checkout sessions have either a payment_intent or an invoice attached
-          const paymentId = (session.payment_intent as string) || (session.invoice as string) || session.id;
-
-          const existingPayment = await tx.payment.findUnique({
-            where: { stripePaymentId: paymentId },
-          });
-
-          if (!existingPayment) {
-            await tx.payment.create({
-              data: {
-                companyId: companyId,
-                stripePaymentId: paymentId,
-                amountCents: session.amount_total || 0,
-                currency: session.currency || "usd",
-                status: PaymentStatus.SUCCEEDED,
-                paidAt: new Date(),
-              },
-            });
-            console.log(`💵 ✅ Initial payment instantly recorded for Company: ${companyId}`);
-          }
-        }
+      // 🌟 FIX 1: Removed transactions to prevent Postgres Deadlocks
+      await prisma.subscription.update({
+        where: { companyId: companyId },
+        data: {
+          stripeSubscriptionId: newSubscriptionId,
+          status: SubscriptionStatus.ACTIVE,
+          plan: planTier,
+          planConfigId: planConfigId,
+          currentPeriodStart: startDate,
+          currentPeriodEnd: endDate,
+          cancelAtPeriodEnd: false,
+        },
       });
 
-      console.log(`✅ Processed checkout.session.completed for company ${companyId}`);
+      await prisma.company.update({
+        where: { id: companyId },
+        data: { plan: planTier },
+      });
+
+      // 🌟 FIX 2: Used UPSERT to completely eliminate race condition crashes
+      if (session.payment_status === "paid") {
+        const paymentId =
+          (session.payment_intent as string) ||
+          (session.invoice as string) ||
+          session.id;
+
+        await prisma.payment.upsert({
+          where: { stripePaymentId: paymentId },
+          update: {}, // If it already exists, do nothing safely
+          create: {
+            companyId: companyId,
+            stripePaymentId: paymentId,
+            amountCents: session.amount_total || 0,
+            currency: session.currency || "usd",
+            status: PaymentStatus.SUCCEEDED,
+            paidAt: new Date(),
+          },
+        });
+        console.log(
+          `💵 ✅ Initial payment instantly recorded for Company: ${companyId}`,
+        );
+      }
+
+      // 🚨 FIX 3: Cancel old plan AFTER database update
+      if (oldSubscriptionId && oldSubscriptionId !== newSubscriptionId) {
+        try {
+          await stripe.subscriptions.cancel(oldSubscriptionId);
+          console.log(
+            `🗑️ Canceled old subscription ${oldSubscriptionId} to prevent double billing.`,
+          );
+        } catch (err) {
+          console.error("Failed to cancel old Stripe subscription:", err);
+        }
+      }
+
+      console.log(
+        `✅ Processed checkout.session.completed for company ${companyId}`,
+      );
       break;
     }
 
@@ -159,24 +192,19 @@ const handleStripeWebhookEvent = async (event: Stripe.Event) => {
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as any;
 
-      // Safe fallback: If payment_intent is null, use the invoice.id.
       const paymentIntentId = invoice.payment_intent || invoice.id;
       const subscriptionId = invoice.subscription as string;
       const customerId = invoice.customer as string;
 
-      // Idempotency guard — don't double-record the same payment
+      // Guard if it's a non-subscription invoice
+      if (!subscriptionId) return { message: "Not a subscription invoice" };
+
       const existingPayment = await prisma.payment.findUnique({
         where: { stripePaymentId: paymentIntentId },
       });
 
-      if (existingPayment) {
-        console.log(
-          `⏭️  Payment ${paymentIntentId} already recorded, skipping`,
-        );
-        return { message: "Already processed" };
-      }
+      if (existingPayment) return { message: "Already processed" };
 
-      // Look up by Customer ID to bypass the Stripe race condition
       const companySub = await prisma.subscription.findUnique({
         where: { stripeCustomerId: customerId },
       });
@@ -186,39 +214,34 @@ const handleStripeWebhookEvent = async (event: Stripe.Event) => {
           subscriptionId,
         )) as any;
 
-        await prisma.$transaction(async (tx) => {
-          await tx.subscription.update({
-            where: { id: companySub.id },
-            data: {
-              stripeSubscriptionId: subscriptionId,
-              currentPeriodStart: new Date(
-                stripeSub.current_period_start * 1000,
-              ),
-              currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
-            },
-          });
+        // No transactions, prevents deadlocks on concurrent webhooks!
+        await prisma.subscription.update({
+          where: { id: companySub.id },
+          data: {
+            stripeSubscriptionId: subscriptionId,
+            currentPeriodStart: new Date(stripeSub.current_period_start * 1000),
+            currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+          },
+        });
 
-          // 💰 Record the revenue
-          await tx.payment.create({
-            data: {
-              companyId: companySub.companyId,
-              stripePaymentId: paymentIntentId,
-              amountCents: invoice.amount_paid,
-              currency: invoice.currency,
-              status: PaymentStatus.SUCCEEDED,
-              paidAt: invoice.status_transitions?.paid_at
-                ? new Date(invoice.status_transitions.paid_at * 1000)
-                : new Date(),
-            },
-          });
+        // Use upsert to handle exact millisecond overlap safely
+        await prisma.payment.upsert({
+          where: { stripePaymentId: paymentIntentId },
+          update: {},
+          create: {
+            companyId: companySub.companyId,
+            stripePaymentId: paymentIntentId,
+            amountCents: invoice.amount_paid,
+            currency: invoice.currency,
+            status: PaymentStatus.SUCCEEDED,
+            paidAt: invoice.status_transitions?.paid_at
+              ? new Date(invoice.status_transitions.paid_at * 1000)
+              : new Date(),
+          },
         });
 
         console.log(
-          `💵 ✅ Payment receipt created for Company: ${companySub.companyId}`,
-        );
-      } else {
-        console.error(
-          `❌ Could not find company for Stripe Customer ${customerId}`,
+          `💵 ✅ Recurring payment receipt created for Company: ${companySub.companyId}`,
         );
       }
       break;
@@ -227,16 +250,29 @@ const handleStripeWebhookEvent = async (event: Stripe.Event) => {
     case "customer.subscription.deleted": {
       const subscription = event.data.object as Stripe.Subscription;
 
+      const companySub = await prisma.subscription.findUnique({
+        where: { stripeSubscriptionId: subscription.id },
+      });
+
+      if (!companySub) {
+        console.log(
+          `⏭️ Ignored deletion for ${subscription.id} (Company has already upgraded)`,
+        );
+        return { message: "Ignored old subscription deletion" };
+      }
+
       const freePlanConfig = await prisma.planConfig.findUnique({
         where: { tier: SubscriptionPlan.FREE },
       });
 
-      const companySub = await prisma.subscription.update({
-        where: { stripeSubscriptionId: subscription.id },
+      // Sequential updates instead of locked transaction
+      await prisma.subscription.update({
+        where: { id: companySub.id },
         data: {
           status: SubscriptionStatus.CANCELED,
           plan: SubscriptionPlan.FREE,
           planConfigId: freePlanConfig?.id,
+          cancelAtPeriodEnd: false,
         },
       });
 
@@ -252,7 +288,7 @@ const handleStripeWebhookEvent = async (event: Stripe.Event) => {
     }
 
     default:
-      console.log(`Unhandled event type ${event.type}`);
+      break;
   }
 
   return { message: `Webhook Event ${event.id} processed successfully` };
@@ -334,10 +370,60 @@ const updatePlanConfig = async (planId: string, payload: any) => {
   });
 };
 
+const getCompanyPayments = async (companyId: string) => {
+  return await prisma.payment.findMany({
+    where: { companyId },
+    orderBy: { paidAt: "desc" },
+  });
+};
+
+const cancelSubscription = async (companyId: string) => {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    include: { subscription: true },
+  });
+
+  if (!company || !company.subscription?.stripeSubscriptionId) {
+    throw new AppError(status.NOT_FOUND, "No active subscription found");
+  }
+
+  await stripe.subscriptions.update(company.subscription.stripeSubscriptionId, {
+    cancel_at_period_end: true,
+  });
+
+  await prisma.subscription.update({
+    where: { companyId },
+    data: { cancelAtPeriodEnd: true },
+  });
+
+  return {
+    message: "Subscription will be canceled at the end of the billing cycle.",
+  };
+};
+
+const getAllPlatformPayments = async (query: Record<string, unknown>) => {
+  const paymentQuery = new QueryBuilder(prisma.payment, query, {
+    searchableFields: ["stripePaymentId"],
+    filterableFields: ["status", "companyId"],
+  })
+    .search()
+    .filter()
+    .paginate()
+    .sort() 
+    .include({
+      company: { select: { name: true, logoUrl: true } },
+    });
+
+  return await paymentQuery.execute();
+};
+
 export const BillingService = {
   createCheckoutSession,
   handleStripeWebhookEvent,
   getAvailablePlans,
   seedPlanConfigs,
   updatePlanConfig,
+  getCompanyPayments,
+  cancelSubscription,
+  getAllPlatformPayments,
 };

@@ -21,7 +21,11 @@ router.post(
   validateRequest(createIncidentSchema),
   IncidentController.createIncident,
 );
-
+router.get(
+  "/",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN), 
+  IncidentController.getCompanyIncidents,
+);
 // 👀 ANY project member can view the safety log
 router.get(
   "/project/:projectId",

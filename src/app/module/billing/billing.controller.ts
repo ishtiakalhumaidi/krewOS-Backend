@@ -7,13 +7,18 @@ import { sendResponse } from "../../shared/sendResponse";
 import { BillingService } from "./billing.service";
 import { stripe } from "../../config/stripe.config";
 import { envVars } from "../../config/env";
+import { get } from "node:http";
 
 const createCheckout = catchAsync(async (req: Request, res: Response) => {
-  const { plan } = req.body; 
+  const { plan } = req.body;
   const companyId = (req as any).user.companyId;
   const userEmail = (req as any).user.email;
 
-  const result = await BillingService.createCheckoutSession(companyId, plan, userEmail);
+  const result = await BillingService.createCheckoutSession(
+    companyId,
+    plan,
+    userEmail,
+  );
 
   sendResponse(res, {
     statusCode: status.OK,
@@ -34,12 +39,13 @@ const getPlans = catchAsync(async (req: Request, res: Response) => {
 });
 
 const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
-
   const signature = req.headers["stripe-signature"] as string;
   const webhookSecret = envVars.STRIPE_WEBHOOK_SECRET;
 
   if (!signature || !webhookSecret) {
-    return res.status(status.BAD_REQUEST).json({ message: "Missing credentials" });
+    return res
+      .status(status.BAD_REQUEST)
+      .json({ message: "Missing credentials" });
   }
 
   let event;
@@ -47,7 +53,9 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
   try {
     event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
   } catch (err: any) {
-    return res.status(status.BAD_REQUEST).json({ message: `Webhook Error: ${err.message}` });
+    return res
+      .status(status.BAD_REQUEST)
+      .json({ message: `Webhook Error: ${err.message}` });
   }
 
   try {
@@ -59,6 +67,7 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
       data: result,
     });
   } catch (error) {
+    console.error("🚨 STRIPE WEBHOOK CRASHED:", error);
     sendResponse(res, {
       statusCode: status.INTERNAL_SERVER_ERROR,
       success: false,
@@ -66,11 +75,21 @@ const handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
     });
   }
 });
+const getAllPlatformPayments = catchAsync(async (req: Request, res: Response) => {
+  const result = await BillingService.getAllPlatformPayments(req.query);
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Platform payments retrieved successfully",
+    data: result,
+  });
+});
+
 
 const updatePlan = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params; 
+  const { id } = req.params;
   const result = await BillingService.updatePlanConfig(id as string, req.body);
-  
+
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
@@ -89,10 +108,35 @@ const seedPlans = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getMyPayments = catchAsync(async (req: Request, res: Response) => {
+  const companyId = (req as any).user.companyId;
+  const result = await BillingService.getCompanyPayments(companyId);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Payment history retrieved successfully",
+    data: result,
+  });
+});
+const cancelSubscription = catchAsync(async (req: Request, res: Response) => {
+  const companyId = (req as any).user.companyId;
+  const result = await BillingService.cancelSubscription(companyId);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Subscription cancellation scheduled successfully",
+    data: result,
+  });
+});
 export const BillingController = {
   createCheckout,
   getPlans,
   handleStripeWebhook,
   updatePlan,
   seedPlans,
+  getMyPayments,
+  cancelSubscription,
+  getAllPlatformPayments,
 };

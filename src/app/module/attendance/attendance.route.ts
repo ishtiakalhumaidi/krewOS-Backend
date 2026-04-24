@@ -52,4 +52,10 @@ router.get(
   AttendanceController.getMyTimesheet,
 );
 
+router.get(
+  "/timesheets",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN), 
+  AttendanceController.getTimesheets,
+);
+
 export const AttendanceRoutes = router;
