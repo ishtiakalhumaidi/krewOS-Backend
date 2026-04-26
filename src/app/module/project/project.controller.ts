@@ -4,6 +4,7 @@ import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { ProjectService } from "./project.service";
+import AppError from "../../errorHelpers/AppError";
 
 const createProject = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -66,9 +67,32 @@ const getProjectById = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
+const updateProject = catchAsync(async (req, res) => {
+  const { projectId } = req.params;
+  const companyId = req.user?.companyId;
+
+  if (!companyId) {
+    throw new AppError(status.UNAUTHORIZED, "Company ID is missing");
+  }
+
+  const result = await ProjectService.updateProject(
+    projectId as string,
+    companyId,
+    req.body
+  );
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Project updated successfully",
+    data: result,
+  });
+});
 export const ProjectController = {
   createProject,
   getCompanyProjects,
   getProjectById,
   getMyProjects,
+  updateProject,
 };

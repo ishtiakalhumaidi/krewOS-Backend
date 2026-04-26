@@ -51,7 +51,7 @@ Create a `.env` file in the root directory:
 # Server
 PORT=5000
 NODE_ENV=development
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=https://krew-os.vercel.app/
 
 # Database
 DATABASE_URL="postgresql://user:password@localhost:5432/krewos?schema=public"

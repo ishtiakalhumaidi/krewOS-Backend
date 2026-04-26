@@ -217,14 +217,62 @@ const getCompanyTimesheets = async (companyId: string, startDate: string, endDat
 
   return timesheets;
 };
+const autoClockOutForgottenShifts = async () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Start of today
 
-// Don't forget to export it!
+  // 1. Find all attendance records from BEFORE today that are still missing a clockOut
+  const openShifts = await prisma.attendance.findMany({
+    where: {
+      clockIn: {
+        lt: today, // Less than today (meaning yesterday or older)
+      },
+      clockOut: null, // They never clocked out!
+    },
+  });
+
+  if (openShifts.length === 0) {
+    return { message: "No forgotten shifts found.", count: 0 };
+  }
+
+  let autoClockedOutCount = 0;
+
+  // 2. Loop through and forcefully close them
+  for (const shift of openShifts) {
+    // Determine the end of the day for the day they clocked in (11:59:59 PM)
+    const endOfDay = new Date(shift.clockIn);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Calculate hours worked up to midnight
+    const diffInMilliseconds = endOfDay.getTime() - shift.clockIn.getTime();
+    const hoursWorked = Number((diffInMilliseconds / (1000 * 60 * 60)).toFixed(2));
+
+    await prisma.attendance.update({
+      where: { id: shift.id },
+      data: {
+        clockOut: endOfDay, // Auto set to 11:59 PM of that day
+        hoursWorked: hoursWorked,
+        // Optional: You could add a field to your Prisma schema like `autoClockedOut: Boolean` to track this!
+      },
+    });
+
+    autoClockedOutCount++;
+  }
+
+  return { 
+    message: "Auto clock-out completed successfully.", 
+    count: autoClockedOutCount 
+  };
+};
+
+
 export const AttendanceService = {
   clockIn,
   clockOut,
   getProjectAttendanceToday,
   getWorkerMonthlyStats,
   getMyTodayAttendance,
-  getCompanyTimesheets
+  getCompanyTimesheets,
+  autoClockOutForgottenShifts,
 
 };

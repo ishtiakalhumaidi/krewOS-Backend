@@ -4,6 +4,8 @@ import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { AttendanceService } from "./attendance.service";
+import AppError from "../../errorHelpers/AppError";
+import { envVars } from "../../config/env";
 
 const clockIn = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -134,6 +136,23 @@ const getTimesheets = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+
+const triggerAutoClockOut = catchAsync(async (req: Request, res: Response) => {
+  // 🛡️ Security: Ensure only Vercel (or a secure authorized ping) can trigger this
+  const authHeader = req.headers.authorization;
+  if (authHeader !== `Bearer ${envVars.CRON_SECRET}`) {
+    throw new  AppError(status.UNAUTHORIZED, "Unauthorized cron request");
+  }
+
+  const result = await AttendanceService.autoClockOutForgottenShifts();
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: result.message,
+    data: { updatedCount: result.count },
+  });
+});
 export const AttendanceController = {
   clockIn,
   clockOut,
@@ -142,4 +161,5 @@ export const AttendanceController = {
   getMyTodayAttendance,
   getMyTimesheet,
   getTimesheets,
+  triggerAutoClockOut
 };

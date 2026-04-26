@@ -57,5 +57,9 @@ router.get(
   checkAuth(UserRole.OWNER, UserRole.ADMIN), 
   AttendanceController.getTimesheets,
 );
+router.post(
+  "/cron/auto-clock-out",
+  AttendanceController.triggerAutoClockOut
+);
 
 export const AttendanceRoutes = router;

@@ -6,13 +6,17 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/server.ts",
+    "build": "prisma generate && tsc && node scripts/fix-imports.js",
+    "build:tsup": "tsup",
+    "start": "node dist/server.js",
+
     "lint": "eslint ./src/**/*.{ts,tsx}",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "studio": "prisma studio",
     "push": "prisma db push",
     "pull": "prisma db pull",
-    "stripe:webhook": "stripe listen --forward-to localhost:5000/api/v1/billing/webhook"
+    "stripe:webhook": "stripe listen --forward-to https://krew-os-backend.vercel.app/api/v1/billing/webhook"
   },
   "keywords": [],
   "type": "module",
@@ -54,6 +58,7 @@
     "@types/pg": "^8.18.0",
     "eslint": "^10.0.3",
     "prisma": "^7.5.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1"
   }

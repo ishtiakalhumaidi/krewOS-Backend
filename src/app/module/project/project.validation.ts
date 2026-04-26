@@ -31,3 +31,16 @@ export const createProjectSchema = z
     message: "End date must be after start date",
     path: ["endDate"],
   });
+export const updateProjectSchema = z.object({
+  name: z.string().min(1, "Project name cannot be empty").optional(),
+  location: z.string().min(1, "Location cannot be empty").optional(),
+  description: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  status: z.enum(["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED"]).optional(),
+});
+
+export const ProjectValidation = {
+  createProjectSchema,
+  updateProjectSchema, 
+};

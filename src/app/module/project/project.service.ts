@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 import { ProjectRole, SubscriptionPlan } from "../../../generated/prisma/enums";
 import AppError from "../../errorHelpers/AppError";
@@ -149,9 +150,36 @@ const getProjectById = async (projectId: string, companyId: string) => {
 
   return project;
 };
+
+const updateProject = async (
+  projectId: string,
+  companyId: string,
+  payload: any
+) => {
+  const existingProject = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!existingProject || existingProject.companyId !== companyId) {
+    throw new AppError(status.NOT_FOUND, "Project not found or unauthorized");
+  }
+
+  // 2. Perform the update
+  const updatedProject = await prisma.project.update({
+    where: { id: projectId },
+    data: {
+      ...payload,
+      startDate: payload.startDate ? new Date(payload.startDate) : undefined,
+      endDate: payload.endDate ? new Date(payload.endDate) : undefined,
+    },
+  });
+
+  return updatedProject;
+};
 export const ProjectService = {
   createProject,
   getCompanyProjects,
   getProjectById,
   getMyProjects,
+  updateProject,
 };

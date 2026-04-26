@@ -23,11 +23,19 @@ import AppError from "../../errorHelpers/AppError";
 import { tokenUtils } from "../../utils/token";
 import { jwtUtils } from "../../utils/jwt";
 import type { JwtPayload } from "jsonwebtoken";
-import { PLAN_LIMITS } from "../../config/subscriptionLimits";
 
 const registerPublicOwner = async (payload: IPublicRegister) => {
   const { companyName, name, email, password } = payload;
+  const existingUser = await prisma.user.findUnique({
+    where: { email },
+  });
 
+  if (existingUser) {
+    throw new AppError(
+      status.CONFLICT,
+      "User already exists with this email. Please login instead.",
+    );
+  }
   const slug =
     companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-") + "-" + Date.now();
 
@@ -50,6 +58,12 @@ const registerPublicOwner = async (payload: IPublicRegister) => {
     if (!data.user) {
       throw new AppError(status.BAD_REQUEST, "Failed to register user");
     }
+    // await auth.api.sendVerificationOTP({
+    //   body: {
+    //     email: data.user.email,
+    //     type: "email-verification",
+    //   },
+    // });
 
     const accessToken = tokenUtils.getAccessToken({
       userId: data.user.id,
@@ -100,7 +114,10 @@ const sendInvite = async (payload: IInviteWorker) => {
   });
 
   if (!planConfig) {
-    throw new AppError(status.INTERNAL_SERVER_ERROR, "Pricing configuration error.");
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      "Pricing configuration error.",
+    );
   }
 
   const limit = planConfig.maxMembers;
@@ -239,7 +256,6 @@ const registerInvitedMember = async (payload: IRegisterMember) => {
       });
     });
   } catch (err: any) {
-    //rollback user if company assignment fails
     await prisma.user.delete({ where: { id: authUser.id } }).catch(() => {});
 
     throw new AppError(
@@ -287,8 +303,6 @@ const loginUser = async (payload: ILoginUser) => {
   if (!data.user) {
     throw new AppError(status.UNAUTHORIZED, "Invalid email or password");
   }
-
-
 
   if (data.user.isDeleted) {
     throw new AppError(
@@ -566,8 +580,8 @@ const resendVerificationCode = async (email: string) => {
   }
 
   // Better Auth utility to send a fresh verification email/OTP
-  return await auth.api.sendVerificationEmail({
-    body: { email },
+  return await auth.api.sendVerificationOTP({
+    body: { email, type: "email-verification" },
   });
 };
 

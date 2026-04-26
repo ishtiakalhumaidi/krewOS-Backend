@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "dist/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "dist/server.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/attendance/cron/auto-clock-out",
+      "schedule": "0 0 * * *" 
+    }
+  ]
+}

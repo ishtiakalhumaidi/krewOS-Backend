@@ -6,7 +6,7 @@ import { BillingController } from "./billing.controller";
 const router = Router();
 router.get(
   "/plans",
-  checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  // checkAuth(UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN),
   BillingController.getPlans,
 );
 router.post(

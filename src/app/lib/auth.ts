@@ -76,6 +76,7 @@ export const auth = betterAuth({
     bearer(),
     emailOTP({
       overrideDefaultEmailVerification: true,
+      sendVerificationOnSignUp: true,
       async sendVerificationOTP({ email, otp, type }) {
         if (type === "email-verification") {
           const user = await prisma.user.findUnique({
@@ -84,7 +85,7 @@ export const auth = betterAuth({
             },
           });
           if (user && !user.emailVerified) {
-            sendEmailVersion2({
+            await sendEmailVersion2({
               to: email,
               subject: "Verify Your Email",
               templateName: "otp",
@@ -101,7 +102,7 @@ export const auth = betterAuth({
             },
           });
           if (user) {
-            sendEmailVersion2({
+            await  sendEmailVersion2({
               to: email,
               subject: "Password Reset OTP",
               templateName: "passwordReset",
@@ -129,29 +130,39 @@ export const auth = betterAuth({
     signIn: `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success`,
   },
   trustedOrigins: [
-    process.env.BETTER_AUTH_URL || "http://localhost:5000",
-    envVars.FRONTEND_URL,
+    // process.env.BETTER_AUTH_URL || "http://localhost:5000",
+    // envVars.FRONTEND_URL,
+    "https://krew-os.vercel.app",
   ],
 
+  // advanced: {
+  //   useSecureCookies: false,
+  //   cookies: {
+  //     state: {
+  //       attributes: {
+  //         sameSite: "None",
+  //         secure: true,
+  //         httpOnly: true,
+  //         path: "/",
+  //       },
+  //     },
+  //     sessionToken: {
+  //       attributes: {
+  //         sameSite: "None",
+  //         secure: true,
+  //         httpOnly: true,
+  //         path: "/",
+  //       },
+  //     },
+  //   },
+  // },
   advanced: {
-    useSecureCookies: false,
-    cookies: {
-      state: {
-        attributes: {
-          sameSite: "None",
-          secure: true,
-          httpOnly: true,
-          path: "/",
-        },
-      },
-      sessionToken: {
-        attributes: {
-          sameSite: "None",
-          secure: true,
-          httpOnly: true,
-          path: "/",
-        },
-      },
+    useSecureCookies: true,
+    defaultCookieAttributes: {
+      sameSite: "None",
+      secure: true,
+      httpOnly: true,
+      partitioned: true,
     },
   },
 });

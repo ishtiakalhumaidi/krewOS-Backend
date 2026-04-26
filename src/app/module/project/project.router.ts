@@ -3,7 +3,7 @@ import { ProjectController } from "./project.controller";
 import { validateRequest } from "../../middleware/validateRequest";
 import { checkAuth } from "../../middleware/checkAuth";
 import { UserRole } from "../../../generated/prisma/enums";
-import { createProjectSchema } from "./project.validation";
+import { createProjectSchema, ProjectValidation } from "./project.validation";
 
 const router = Router();
 
@@ -31,5 +31,12 @@ router.get(
   "/:projectId",
   checkAuth(UserRole.ADMIN, UserRole.OWNER, UserRole.MEMBER),
   ProjectController.getProjectById,
+);
+
+router.patch(
+  "/:projectId",
+  checkAuth(UserRole.ADMIN, UserRole.OWNER),
+  validateRequest(ProjectValidation.updateProjectSchema),
+  ProjectController.updateProject,
 );
 export const ProjectRoutes = router;
