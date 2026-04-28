@@ -31,8 +31,20 @@ const getProjectChecklists = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getCompanyChecklists = catchAsync(async (req: Request, res: Response) => {
+  const companyId = (req as any).user.companyId;
+  const result = await SafetyChecklistService.getCompanyChecklists(companyId, req.query);
 
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Company safety checklists retrieved successfully",
+    data: result.data,
+    meta: result.meta,
+  });
+});
 export const SafetyChecklistController = {
   createChecklist,
   getProjectChecklists,
+  getCompanyChecklists,
 };

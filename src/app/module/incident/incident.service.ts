@@ -48,7 +48,7 @@ const getCompanyIncidents = async (companyId: string, query: Record<string, unkn
     query, 
     {
       searchableFields: ['title', 'description'],
-      filterableFields: ['status', 'severity', 'projectId'],
+      filterableFields: ['status', 'severity', 'projectId', 'isResolved', 'createdAt'],
     }
   )
     .search()
@@ -110,11 +110,19 @@ const getMyIncidents = async (userId: string, query: Record<string, unknown>) =>
 
   return await incidentQuery.execute();
 };
+const deleteIncident = async (incidentId: string) => {
+  // Prisma will automatically throw an error if the record doesn't exist
+  const result = await prisma.incident.delete({
+    where: { id: incidentId },
+  });
 
+  return result;
+};
 export const IncidentService = {
   createIncident,
   getProjectIncidents,
   resolveIncident,
   getMyIncidents,
-  getCompanyIncidents
+  getCompanyIncidents,
+  deleteIncident,
 };

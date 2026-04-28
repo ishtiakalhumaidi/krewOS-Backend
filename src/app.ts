@@ -10,6 +10,7 @@ import path from "path";
 import cors from "cors";
 // import { envVars } from "./app/config/env";
 import { BillingController } from "./app/module/billing/billing.controller";
+import { envVars } from "./app/config/env";
 
 const app: Application = express();
 
@@ -25,10 +26,10 @@ app.post(
 app.use(
   cors({
     origin: [
-      // envVars.FRONTEND_URL,
-      // envVars.BETTER_AUTH_URL,
+      envVars.FRONTEND_URL,
+      envVars.BETTER_AUTH_URL,
       "https://krew-os.vercel.app",
-      // "http://localhost:5000",
+      "http://localhost:5000",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],

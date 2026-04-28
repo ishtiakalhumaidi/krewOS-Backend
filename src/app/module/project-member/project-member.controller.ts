@@ -3,6 +3,7 @@ import status from "http-status";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendResponse } from "../../shared/sendResponse";
 import { ProjectMemberService } from "./project-member.service";
+import AppError from "../../errorHelpers/AppError";
 
 const addMember = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -29,7 +30,22 @@ const getMembers = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const getMyRole = catchAsync(async (req: Request, res: Response) => {
+  const { projectId } = req.params;
+  const userId = req.user?.userId; 
+  if (!userId) {
+    throw new AppError(status.UNAUTHORIZED, "User not authenticated");
+  }
 
+  const result = await ProjectMemberService.getMyRole(projectId as string, userId);
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "My project role retrieved successfully",
+    data: result,
+  });
+});
 const removeMember = catchAsync(async (req: Request, res: Response) => {
   const { projectId, userId } = req.params;
   const result = await ProjectMemberService.removeMember(
@@ -66,4 +82,5 @@ export const ProjectMemberController = {
   getMembers,
   removeMember,
   updateRole,
+  getMyRole,
 };

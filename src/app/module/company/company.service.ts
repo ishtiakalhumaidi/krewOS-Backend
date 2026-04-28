@@ -7,7 +7,7 @@ import { QueryBuilder } from "../../utils/QueryBuilder";
 const getAllCompanies = async (query: Record<string, unknown>) => {
   const companyQuery = new QueryBuilder(prisma.company, query, {
     searchableFields: ["name", "slug"],
-    filterableFields: ["plan", "isActive", "status"], 
+    filterableFields: ["plan", "isActive", "status"],
   })
     .search()
     .filter()
@@ -74,9 +74,13 @@ const changeCompanyStatus = async (
   companyId: string,
   payload: IChangeCompanyStatus,
 ) => {
+  const isActive = payload.status === "ACTIVE";
   const result = await prisma.company.update({
     where: { id: companyId },
-    data: { status: payload.status },
+    data: {
+      status: payload.status,
+      isActive: isActive,
+    },
   });
   return result;
 };

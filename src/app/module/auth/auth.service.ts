@@ -4,6 +4,7 @@ import status from "http-status";
 
 import { envVars } from "../../config/env";
 import {
+  CompanyStatus,
   InviteStatus,
   SubscriptionPlan,
   UserRole,
@@ -318,6 +319,41 @@ const loginUser = async (payload: ILoginUser) => {
     );
   }
 
+  // 👉 NEW: Fetch the user and their company from Prisma to check company status
+  const dbUser = await prisma.user.findUnique({
+    where: { id: data.user.id },
+    include: { company: true },
+  });
+
+  if (dbUser?.company) {
+    const company = dbUser.company;
+
+    // 1. If company is SUSPENDED: Block everyone and redirect to KrewOS helpline.
+    if (company.status === CompanyStatus.SUSPENDED) {
+      throw new AppError(
+        status.FORBIDDEN,
+        "Your company account has been suspended. Please contact the KrewOS helpline."
+      );
+    }
+
+    // 2. If company is INACTIVE:
+    if (company.status === CompanyStatus.INACTIVE) {
+      if (dbUser.role === UserRole.OWNER || dbUser.role === UserRole.ADMIN) {
+        // Automatically reactivate the company since an Admin/Owner is logging in
+        await prisma.company.update({
+          where: { id: company.id },
+          data: { status: CompanyStatus.ACTIVE, isActive: true },
+        });
+      } else {
+        // Block normal workers/members from logging in until an admin reactivates it
+        throw new AppError(
+          status.FORBIDDEN,
+          "Your company account is currently inactive. Please contact your Company Manager or Admin."
+        );
+      }
+    }
+  }
+
   const accessToken = tokenUtils.getAccessToken({
     userId: data.user.id,
     role: data.user.role,
@@ -325,6 +361,7 @@ const loginUser = async (payload: ILoginUser) => {
     email: data.user.email,
     isDelete: data.user.isDeleted,
     emailVerified: data.user.emailVerified,
+    companyId: dbUser?.companyId, // Ensure companyId is passed along if needed
   });
   const refreshToken = tokenUtils.getRefreshToken({
     userId: data.user.id,
@@ -333,6 +370,7 @@ const loginUser = async (payload: ILoginUser) => {
     email: data.user.email,
     isDelete: data.user.isDeleted,
     emailVerified: data.user.emailVerified,
+    companyId: dbUser?.companyId,
   });
 
   return { ...data, accessToken, refreshToken };

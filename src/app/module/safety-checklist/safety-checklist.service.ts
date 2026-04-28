@@ -2,6 +2,7 @@ import status from "http-status";
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 import type { ICreateSafetyChecklist } from "./safety-checklist.interface";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
 const createChecklist = async (payload: ICreateSafetyChecklist) => {
   // 1. Verify the worker is on the project
@@ -47,8 +48,29 @@ const getProjectChecklists = async (projectId: string) => {
   });
   return result;
 };
+const getCompanyChecklists = async (companyId: string, query: Record<string, unknown>) => {
+  const checklistQuery = new QueryBuilder(
+    prisma.safetyChecklist, 
+    query, 
+    {
+      searchableFields: ['notes', 'project.name', 'submitter.name'],
+      filterableFields: ['allClear', 'projectId', 'checkDate', "createdAt"],
+    }
+  )
+    .search()
+    .filter()
+    .where({ project: { companyId: companyId } }) 
+    .paginate()
+    .sort()
+    .include({
+      project: { select: { id: true, name: true } },
+      submitter: { select: { id: true, name: true, email: true } }
+    });
 
+  return await checklistQuery.execute();
+};
 export const SafetyChecklistService = {
   createChecklist,
   getProjectChecklists,
+  getCompanyChecklists
 };

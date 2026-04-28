@@ -7,7 +7,11 @@ import { ProjectRole, UserRole } from "../../../generated/prisma/enums";
 import { createSafetyChecklistSchema } from "./safety-checklist.validation";
 
 const router = Router();
-
+router.get(
+  "/",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN),
+  SafetyChecklistController.getCompanyChecklists
+);  
 // 🛡️ ONLY Safety Officers and Managers can submit checklists
 router.post(
   "/",

@@ -3,9 +3,8 @@ import { InviteStatus, PaymentStatus, SubscriptionPlan, UserRole } from "../../.
 import AppError from "../../errorHelpers/AppError";
 import { prisma } from "../../lib/prisma";
 
-// 👉 1. FIX: Changed `id` to `userId` to match your auth token payload
 interface IRequestUser {
-  userId: string; 
+  userId: string;
   email: string;
   role: UserRole;
   companyId: string;
@@ -24,8 +23,7 @@ const getDashboardStatsData = async (user: IRequestUser) => {
       statsData = await getAdminStatsData(user.companyId);
       break;
     case UserRole.MEMBER:
-      // 👉 2. FIX: Pass user.userId instead of user.id
-      statsData = await getMemberStatsData(user.userId); 
+      statsData = await getMemberStatsData(user.userId);
       break;
     default:
       throw new AppError(status.BAD_REQUEST, "Invalid user role");
@@ -37,19 +35,31 @@ const getDashboardStatsData = async (user: IRequestUser) => {
   };
 };
 
-// 🌍 1. SUPER ADMIN: Global Stats (All Companies)
+// 🌍 1. SUPER ADMIN: Global SaaS Health Stats
 const getSuperAdminStatsData = async () => {
   const companyCount = await prisma.company.count();
-  
-  const userCount = await prisma.user.count({ where: { isActive: true } }); 
+  const userCount = await prisma.user.count({ where: { isActive: true } });
   const projectCount = await prisma.project.count();
   const paymentCount = await prisma.payment.count();
 
+  // Total Lifetime Revenue
   const totalRevenue = await prisma.payment.aggregate({
     _sum: { amountCents: true },
-    where: {
-      status: PaymentStatus.SUCCEEDED, 
-    },
+    where: { status: PaymentStatus.SUCCEEDED },
+  });
+
+  // MRR (Monthly Recurring Revenue Estimation based on active PRO/ENTERPRISE plans)
+  // Assuming a rough calculation: PRO = $49, ENTERPRISE = $159
+  const activeSubscriptions = await prisma.subscription.groupBy({
+    by: ["plan"],
+    where: { cancelAtPeriodEnd: false },
+    _count: { id: true },
+  });
+
+  let estimatedMRRCents = 0;
+  activeSubscriptions.forEach((sub) => {
+    if (sub.plan === SubscriptionPlan.PRO) estimatedMRRCents += sub._count.id * 4900;
+    if (sub.plan === SubscriptionPlan.ENTERPRISE) estimatedMRRCents += sub._count.id * 15900;
   });
 
   const subscriptionDistribution = await prisma.subscription.groupBy({
@@ -67,12 +77,16 @@ const getSuperAdminStatsData = async () => {
     projectCount,
     paymentCount,
     totalRevenueCents: totalRevenue._sum.amountCents || 0,
+    estimatedMRRCents,
     subscriptionDistribution: formattedSubscriptionDistribution,
   };
 };
 
-// 🏢 2. OWNER/ADMIN: Company-Wide Stats
+// 🏢 2. OWNER/ADMIN: Company-Wide Action Center
 const getAdminStatsData = async (companyId: string) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     include: { subscription: true },
@@ -80,34 +94,47 @@ const getAdminStatsData = async (companyId: string) => {
 
   const currentPlan = company?.subscription?.plan || SubscriptionPlan.FREE;
 
-  // 2. Fetch the dynamic limits from the DB
   const planConfig = await prisma.planConfig.findUnique({
     where: { tier: currentPlan },
   });
 
-  // 3. Calculate general counts
-  const projectCount = await prisma.project.count({
-    where: { companyId },
-  });
+  // --- Project & User Metrics ---
+  const totalProjects = await prisma.project.count({ where: { companyId } });
+  const activeProjects = await prisma.project.count({ where: { companyId, status: "ACTIVE" } });
 
-  const activeUsers = await prisma.user.count({
-    where: { companyId, isDeleted: false },
-  });
-  
-  const pendingInvites = await prisma.invite.count({
-    where: { companyId, status: InviteStatus.PENDING },
-  });
-  
+  const activeUsers = await prisma.user.count({ where: { companyId, isDeleted: false } });
+  const pendingInvites = await prisma.invite.count({ where: { companyId, status: InviteStatus.PENDING } });
   const employeeCount = activeUsers + pendingInvites;
 
-  const taskCount = await prisma.task.count({
-    where: { project: { companyId } },
+  // --- Action Center Metrics (Things requiring attention) ---
+  
+  // 👉 FIX: Only count unresolved incidents
+  const unresolvedIncidentCount = await prisma.incident.count({
+    where: { project: { companyId }, isResolved: false },
   });
 
-  const incidentCount = await prisma.incident.count({
-    where: { project: { companyId } },
+  // 👉 NEW: Pending Material Requests needing approval
+  const pendingMaterialRequests = await prisma.materialRequest.count({
+    where: { project: { companyId }, status: "PENDING" }
   });
 
+  // 👉 NEW: Today's Failed Safety Checklists
+  const failedSafetyChecksToday = await prisma.safetyChecklist.findMany({
+    where: {
+      project: { companyId },
+      allClear: false,
+      checkDate: { gte: todayStart }
+    },
+    select: {
+      id: true,
+      checkDate: true,
+      project: { select: { name: true } },
+      submitter: { select: { name: true } }
+    }
+  });
+
+  // --- Task Metrics ---
+  const taskCount = await prisma.task.count({ where: { project: { companyId } } });
   const taskStatusDistribution = await prisma.task.groupBy({
     by: ["status"],
     where: { project: { companyId } },
@@ -118,7 +145,7 @@ const getAdminStatsData = async (companyId: string) => {
     ({ _count, status }) => ({ status, count: _count.id })
   );
 
-  // 4. Calculate Subscription Time Remaining
+  // --- Subscription Logic ---
   let daysRemaining = null;
   let totalPeriodDays = null;
   const periodStart = company?.subscription?.currentPeriodStart;
@@ -134,16 +161,17 @@ const getAdminStatsData = async (companyId: string) => {
   }
 
   return {
-    projectCount,
+    projectCount: totalProjects,
+    activeProjects,
     employeeCount,
     taskCount,
-    incidentCount,
+    incidentCount: unresolvedIncidentCount, // Only unresolved
+    pendingMaterialRequests, // Actionable item
+    failedSafetyChecksToday, // Critical daily alert
     taskStatusDistribution: formattedTaskDistribution,
-    
-    // 👉 NEW: Send quota and billing data to the frontend
     subscriptionStats: {
       plan: currentPlan,
-      projectsUsed: projectCount,
+      projectsUsed: totalProjects,
       projectsLimit: planConfig?.maxProjects || 1,
       membersUsed: employeeCount,
       membersLimit: planConfig?.maxMembers || 5,
@@ -154,8 +182,14 @@ const getAdminStatsData = async (companyId: string) => {
   };
 };
 
-// 👷 3. MEMBER: Personal Workload Stats
+// 👷 3. MEMBER: Personal Workload & Accountability Stats
 const getMemberStatsData = async (userId: string) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  
+  const next3Days = new Date();
+  next3Days.setDate(next3Days.getDate() + 3);
+
   const myProjectCount = await prisma.projectMember.count({
     where: { userId },
   });
@@ -164,8 +198,28 @@ const getMemberStatsData = async (userId: string) => {
     where: { assignedTo: userId },
   });
 
-  const myIncidentCount = await prisma.incident.count({
-    where: { reportedBy: userId },
+  // 👉 NEW: Overdue Tasks (Passed due date, not DONE)
+  const overdueTasks = await prisma.task.count({
+    where: { 
+      assignedTo: userId, 
+      status: { not: "DONE" },
+      dueDate: { lt: new Date() }
+    }
+  });
+
+  // 👉 NEW: Upcoming Deadlines (Due in next 3 days)
+  const upcomingDeadlines = await prisma.task.findMany({
+    where: {
+      assignedTo: userId,
+      status: { not: "DONE" },
+      dueDate: { gte: new Date(), lte: next3Days }
+    },
+    select: { id: true, title: true, dueDate: true, project: { select: { name: true } } }
+  });
+
+  // 👉 NEW: Pending Material Requests I submitted
+  const myPendingMaterials = await prisma.materialRequest.count({
+    where: { requestedBy: userId, status: "PENDING" }
   });
 
   const myTaskStatusDistribution = await prisma.task.groupBy({
@@ -181,7 +235,9 @@ const getMemberStatsData = async (userId: string) => {
   return {
     myProjectCount,
     myTaskCount,
-    myIncidentCount,
+    overdueTasks, // Accountability metric
+    upcomingDeadlines, // Actionable metric
+    myPendingMaterials, // Are they waiting on approvals?
     myTaskStatusDistribution: formattedTaskDistribution,
   };
 };

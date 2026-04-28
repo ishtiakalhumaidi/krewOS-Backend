@@ -77,6 +77,18 @@ const getMyIncidents = catchAsync(async (req: Request, res: Response) => {
     data: result.data,
   });
 });
+const deleteIncident = catchAsync(async (req: Request, res: Response) => {
+  const { incidentId } = req.params;
+
+  const result = await IncidentService.deleteIncident(incidentId as string) ;
+
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Incident permanently deleted",
+    data: result,
+  });
+});
 
 export const IncidentController = {
   createIncident,
@@ -84,4 +96,5 @@ export const IncidentController = {
   resolveIncident,
   getMyIncidents,
   getCompanyIncidents,
+  deleteIncident,
 };

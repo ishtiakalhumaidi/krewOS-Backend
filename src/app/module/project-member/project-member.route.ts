@@ -27,6 +27,11 @@ router.get(
   checkProjectRole(),
   ProjectMemberController.getMembers
 );
+router.get(
+  "/project/:projectId/me",
+  checkAuth(),
+  ProjectMemberController.getMyRole
+);
 
 // 🛡️ ONLY Project Managers can promote/demote a worker's role
 router.patch(
@@ -41,7 +46,7 @@ router.patch(
 router.delete(
   "/project/:projectId/user/:userId",
   checkAuth(),
-  checkProjectRole(ProjectRole.PROJECT_MANAGER),
+  checkProjectRole(ProjectRole.PROJECT_MANAGER,ProjectRole.SITE_MANAGER),
   ProjectMemberController.removeMember,
 );
 

@@ -23,7 +23,7 @@ router.post(
 );
 router.get(
   "/",
-  checkAuth(UserRole.OWNER, UserRole.ADMIN), 
+  checkAuth(UserRole.OWNER, UserRole.ADMIN),
   IncidentController.getCompanyIncidents,
 );
 // 👀 ANY project member can view the safety log
@@ -52,5 +52,9 @@ router.patch(
   validateRequest(updateIncidentStatusSchema),
   IncidentController.resolveIncident,
 );
-
+router.delete(
+  "/:incidentId",
+  checkAuth(UserRole.OWNER, UserRole.ADMIN),
+  IncidentController.deleteIncident,
+);
 export const IncidentRoutes = router;

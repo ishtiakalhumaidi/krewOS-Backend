@@ -37,6 +37,23 @@ const addMemberToProject = async (payload: IAddProjectMember) => {
   }
 };
 
+const getMyRole = async (projectId: string, userId: string) => {
+  const member = await prisma.projectMember.findUnique({
+    where: {
+      projectId_userId: {
+        projectId,
+        userId,
+      },
+    },
+  });
+
+  if (!member) {
+    throw new AppError(status.NOT_FOUND, "You are not a member of this project");
+  }
+
+  return member;
+};
+
 const getProjectMembers = async (projectId: string) => {
   const result = await prisma.projectMember.findMany({
     where: { projectId },
@@ -127,4 +144,5 @@ export const ProjectMemberService = {
   getProjectMembers,
   removeMember,
   updateMemberRole,
+  getMyRole,
 };
