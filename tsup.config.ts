@@ -4,7 +4,7 @@ import { cp } from "fs/promises";
 
 export default defineConfig({
   entry: ["src/server.ts"],
-  format: ["esm"], // Keep this as ESM
+  format: ["esm"],
   target: "esnext",
   outDir: "dist",
   clean: true,
@@ -19,7 +19,6 @@ export default defineConfig({
   },
   onSuccess: async () => {
     try {
-      // Copies the templates into the exact folder structure Vercel expects
       await cp("src/app/templates", "dist/app/templates", { recursive: true });
       console.log("✅ EJS Templates successfully copied to dist/app/templates");
     } catch (error) {
